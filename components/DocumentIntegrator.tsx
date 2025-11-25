@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, FileText, Bot, PanelRightClose, PanelRightOpen, Sparkles, MessageSquarePlus, Maximize2, Upload } from 'lucide-react';
+import { Send, FileText, Bot, PanelRightClose, PanelRightOpen, Sparkles, MessageSquarePlus, Maximize2, Upload, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createGeminiClient } from '../services/gemini';
 import { ChatMessage, DocumentFile } from '../types';
@@ -20,10 +20,8 @@ const DocumentIntegrator: React.FC<DocumentIntegratorProps> = ({ documents, acti
   
   const chatEndRef = useRef<HTMLDivElement>(null);
   const documentRef = useRef<HTMLDivElement>(null);
-
   const activeDoc = documents.find(d => d.id === activeDocId);
 
-  // Initialize chat when doc changes
   useEffect(() => {
     if (activeDoc) {
         setMessages([{ 
@@ -34,7 +32,7 @@ const DocumentIntegrator: React.FC<DocumentIntegratorProps> = ({ documents, acti
     } else {
         setMessages([]);
     }
-  }, [activeDoc?.id]); // Only trigger if ID changes
+  }, [activeDoc?.id]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -52,26 +50,18 @@ const DocumentIntegrator: React.FC<DocumentIntegratorProps> = ({ documents, acti
 
     try {
         const ai = createGeminiClient();
-        
-        // Context injection using the ACTUAL document content
         const prompt = `
         You are an expert Document Analyst.
-        
         DOCUMENT CONTEXT (${activeDoc.name}):
         ${activeDoc.content || "No text content available."}
-        
-        USER QUESTION: 
-        ${textToSend}
-        
+        USER QUESTION: ${textToSend}
         Please provide a specific, evidence-based answer citing the document where possible.
         `;
 
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: prompt,
-            config: {
-                systemInstruction: "You are a professional assistant. Be concise and precise."
-            }
+            config: { systemInstruction: "You are a professional assistant. Be concise and precise." }
         });
 
         const responseText = response.text;
@@ -90,11 +80,9 @@ const DocumentIntegrator: React.FC<DocumentIntegratorProps> = ({ documents, acti
         setSelectionMenu(null);
         return;
     }
-
     const text = selection.toString();
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
-    
     if (documentRef.current) {
          const containerRect = documentRef.current.getBoundingClientRect();
          setSelectionMenu({
@@ -116,16 +104,16 @@ const DocumentIntegrator: React.FC<DocumentIntegratorProps> = ({ documents, acti
 
   if (documents.length === 0) {
       return (
-          <div className="flex flex-col h-full items-center justify-center bg-background text-textMuted space-y-4">
-              <div className="w-16 h-16 bg-surfaceHighlight rounded-full flex items-center justify-center mb-2">
-                  <FileText className="w-8 h-8 opacity-50" />
+          <div className="flex flex-col h-full items-center justify-center bg-background text-textMuted space-y-6">
+              <div className="relative">
+                  <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full"></div>
+                  <div className="w-20 h-20 bg-surfaceHighlight border border-border rounded-2xl flex items-center justify-center relative z-10 shadow-xl">
+                    <FileText className="w-10 h-10 text-textMuted" />
+                  </div>
               </div>
-              <h2 className="text-xl font-semibold text-text">No Documents Available</h2>
-              <p className="max-w-md text-center text-sm">Upload documents to start using the deep analysis tools.</p>
-              <button 
-                onClick={onUploadRequest}
-                className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
-              >
+              <h2 className="text-2xl font-bold text-text">No Documents Available</h2>
+              <p className="max-w-md text-center text-sm leading-relaxed">Upload documents to unlock the Deep Analysis tools.</p>
+              <button onClick={onUploadRequest} className="flex items-center gap-2 px-8 py-3 bg-primary text-white rounded-xl font-medium hover:bg-primary/90 transition-all shadow-lg shadow-primary/25">
                   <Upload className="w-4 h-4" /> Go to Upload
               </button>
           </div>
@@ -133,38 +121,39 @@ const DocumentIntegrator: React.FC<DocumentIntegratorProps> = ({ documents, acti
   }
 
   return (
-    <div className="flex flex-col h-full bg-background overflow-hidden transition-colors duration-300">
+    <div className="flex flex-col h-full bg-background overflow-hidden">
         
-        {/* Top Carousel Navigation */}
-        <div className="h-14 bg-surface border-b border-border flex items-center px-4 gap-3 overflow-x-auto no-scrollbar transition-colors duration-300 shrink-0">
+        {/* Navigation Bar */}
+        <div className="h-16 bg-surface/80 backdrop-blur-md border-b border-border flex items-center px-4 gap-3 overflow-x-auto no-scrollbar shrink-0 z-20">
             {documents.map((doc) => (
                 <button 
                     key={doc.id}
                     onClick={() => setActiveDocId(doc.id)}
                     className={`
-                        flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm whitespace-nowrap transition-all
+                        relative group flex items-center gap-3 px-4 py-2 rounded-xl text-sm whitespace-nowrap transition-all border
                         ${activeDocId === doc.id 
-                            ? 'bg-primary/10 border-primary text-primary shadow-[0_0_10px_rgba(76,139,245,0.1)]' 
-                            : 'bg-surfaceHighlight border-transparent text-textMuted hover:text-text hover:bg-surfaceHighlight/80'}
+                            ? 'bg-primary/10 border-primary/30 text-primary shadow-sm' 
+                            : 'bg-transparent border-transparent text-textMuted hover:bg-surfaceHighlight hover:text-text'}
                     `}
                 >
-                    <FileText className="w-3.5 h-3.5" />
-                    <span className="truncate max-w-[150px]">{doc.name}</span>
+                    <FileText className="w-4 h-4" />
+                    <span className="font-medium truncate max-w-[150px]">{doc.name}</span>
+                    {activeDocId === doc.id && (
+                        <motion.div layoutId="activeDocIndicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary mx-4 rounded-t-full" />
+                    )}
                 </button>
             ))}
         </div>
 
-        {/* Split Screen Content */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden relative">
             
-            {/* Left Panel: Document Viewer */}
+            {/* Document Viewer (Paper Metaphor) */}
             <div 
                 ref={documentRef}
-                className="flex-1 bg-background border-r border-border p-8 overflow-y-auto relative transition-all duration-300 scroll-smooth"
+                className="flex-1 bg-zinc-100/5 dark:bg-[#0c0c0e] border-r border-border p-8 overflow-y-auto relative scroll-smooth"
                 onMouseUp={handleMouseUp}
             >
-                 {/* Toolbar */}
-                 <div className="absolute top-4 right-8 flex gap-2 z-10">
+                 <div className="absolute top-6 right-8 flex gap-2 z-20">
                     <AnimatePresence>
                         {!isPanelOpen && (
                             <motion.button 
@@ -172,43 +161,44 @@ const DocumentIntegrator: React.FC<DocumentIntegratorProps> = ({ documents, acti
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.8 }}
                                 onClick={() => setIsPanelOpen(true)}
-                                className="p-2 bg-primary/90 rounded hover:bg-primary text-white shadow-lg transition"
-                                title="Open Assistant"
+                                className="p-2.5 bg-primary text-white rounded-lg shadow-xl hover:bg-primary/90 transition-all"
                             >
                                 <PanelRightOpen className="w-4 h-4" />
                             </motion.button>
                         )}
                     </AnimatePresence>
                     {isPanelOpen && (
-                        <button 
-                            onClick={() => setIsPanelOpen(false)}
-                            className="p-2 bg-black/10 hover:bg-black/20 dark:bg-black/50 dark:hover:bg-black/80 rounded text-text transition"
-                            title="Maximize Document"
-                        >
+                        <button onClick={() => setIsPanelOpen(false)} className="p-2 bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 rounded-lg text-text transition-colors backdrop-blur-md">
                             <Maximize2 className="w-4 h-4" />
                         </button>
                     )}
                  </div>
 
-                 {/* Document Rendering Area */}
-                 <div className="max-w-[800px] mx-auto bg-white min-h-[1000px] shadow-2xl p-12 text-black font-serif selection:bg-blue-200 selection:text-black">
+                 {/* Paper Sheet */}
+                 <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                    className="max-w-[850px] mx-auto bg-white min-h-[1100px] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] p-14 text-zinc-900 font-serif relative"
+                 >
                     {activeDoc ? (
                         <>
-                            <div className="text-xs text-gray-400 mb-8 border-b pb-2 flex justify-between select-none">
-                                <span>CONFIDENTIAL</span>
-                                <span>{activeDoc.name}</span>
+                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-80"></div>
+                            <div className="flex justify-between items-center mb-10 border-b border-zinc-200 pb-4">
+                                <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">Confidential Document</span>
+                                <span className="text-xs font-mono text-zinc-400">{activeDoc.id}</span>
                             </div>
-                            <h1 className="text-2xl font-bold mb-6 text-center text-gray-900 uppercase">{activeDoc.name.replace(/\.[^/.]+$/, "").replace(/_/g, " ")}</h1>
-                            <p className="text-justify leading-relaxed text-gray-800 whitespace-pre-wrap font-mono text-sm">
+                            <h1 className="text-3xl font-bold mb-8 text-zinc-900 leading-tight">{activeDoc.name.replace(/\.[^/.]+$/, "").replace(/_/g, " ")}</h1>
+                            <p className="text-justify leading-loose text-zinc-800 whitespace-pre-wrap font-serif text-[15px]">
                                 {activeDoc.content}
                             </p>
                         </>
                     ) : (
-                        <div className="h-full flex items-center justify-center text-gray-400">Select a document</div>
+                        <div className="h-full flex items-center justify-center text-zinc-300 italic">Select a document to view contents</div>
                     )}
-                 </div>
+                 </motion.div>
 
-                 {/* Floating Context Menu */}
+                 {/* Context Menu */}
                  <AnimatePresence>
                     {selectionMenu && (
                         <motion.div 
@@ -220,81 +210,81 @@ const DocumentIntegrator: React.FC<DocumentIntegratorProps> = ({ documents, acti
                         >
                             <button 
                                 onClick={handleAskAboutSelection}
-                                className="bg-surface border border-border text-text shadow-xl rounded-lg px-3 py-2 flex items-center gap-2 hover:bg-primary hover:text-white hover:border-primary transition-all group"
+                                className="bg-zinc-900 text-white shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-2 hover:bg-black transition-all group ring-1 ring-white/10"
                             >
-                                <Sparkles className="w-4 h-4 text-accent group-hover:text-white" />
+                                <Sparkles className="w-4 h-4 text-purple-400 group-hover:animate-pulse" />
                                 <span className="text-sm font-medium">Ask Copilot</span>
                             </button>
-                            <div className="w-3 h-3 bg-surface border-b border-r border-border transform rotate-45 absolute left-1/2 -ml-1.5 -bottom-1.5 shadow-sm"></div>
+                            <div className="w-3 h-3 bg-zinc-900 transform rotate-45 absolute left-1/2 -ml-1.5 -bottom-1"></div>
                         </motion.div>
                     )}
                  </AnimatePresence>
             </div>
 
-            {/* Right Panel: Context Aware Assistant */}
+            {/* Chat Panel */}
             <motion.div 
                 initial={{ width: 450, opacity: 1 }}
-                animate={{ 
-                    width: isPanelOpen ? 450 : 0, 
-                    opacity: isPanelOpen ? 1 : 0 
-                }}
+                animate={{ width: isPanelOpen ? 450 : 0, opacity: isPanelOpen ? 1 : 0 }}
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                className="bg-surface flex flex-col border-l border-border overflow-hidden transition-colors duration-300"
+                className="bg-surface/95 backdrop-blur-md border-l border-border flex flex-col z-30 shadow-2xl"
             >
                 <div className="min-w-[450px] flex flex-col h-full"> 
-                    <div className="p-4 border-b border-border flex items-center justify-between bg-surface transition-colors duration-300">
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-accent flex items-center justify-center">
-                                <Bot className="w-4 h-4 text-white" />
+                    <div className="p-5 border-b border-border flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
+                                <Bot className="w-5 h-5 text-white" />
                             </div>
                             <div>
-                                <h3 className="font-semibold text-sm text-text">Loan Copilot</h3>
-                                <p className="text-[10px] text-textMuted flex items-center gap-1">
-                                    <span className={`w-1.5 h-1.5 rounded-full ${activeDoc ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                                    {activeDoc ? 'Context Active' : 'No Context'}
-                                </p>
+                                <h3 className="font-bold text-sm text-text">Loan Copilot</h3>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className={`w-1.5 h-1.5 rounded-full ${activeDoc ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' : 'bg-red-500'}`}></span>
+                                    <span className="text-[10px] text-textMuted font-mono uppercase tracking-wider">{activeDoc ? 'ONLINE' : 'OFFLINE'}</span>
+                                </div>
                             </div>
                         </div>
-                        <button 
-                            onClick={() => setIsPanelOpen(false)}
-                            className="p-2 hover:bg-surfaceHighlight rounded text-textMuted hover:text-text transition-colors"
-                        >
+                        <button onClick={() => setIsPanelOpen(false)} className="p-2 hover:bg-surfaceHighlight rounded-lg text-textMuted hover:text-text transition-colors">
                             <PanelRightClose className="w-4 h-4" />
                         </button>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    <div className="flex-1 overflow-y-auto p-5 space-y-6">
                         {messages.length === 0 && (
-                             <div className="text-center text-textMuted text-xs mt-10">
-                                 Ask me anything about <br/> <span className="text-primary font-medium">{activeDoc?.name}</span>
+                             <div className="flex flex-col items-center justify-center h-full text-textMuted opacity-50 space-y-3">
+                                 <Bot className="w-12 h-12 stroke-1" />
+                                 <p className="text-sm text-center font-medium">Ready to analyze <br/> <span className="text-primary">{activeDoc?.name}</span></p>
                              </div>
                         )}
                         {messages.map((msg, i) => (
-                            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <motion.div 
+                                key={i} 
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                            >
                                 <div className={`
-                                    max-w-[85%] rounded-2xl p-3 text-sm leading-relaxed whitespace-pre-wrap
+                                    max-w-[85%] rounded-2xl p-4 text-sm leading-relaxed shadow-sm
                                     ${msg.role === 'user' 
-                                        ? 'bg-primary text-white rounded-br-none' 
-                                        : 'bg-surfaceHighlight text-text rounded-bl-none border border-border'}
+                                        ? 'bg-primary text-white rounded-br-sm' 
+                                        : 'bg-surfaceHighlight border border-border text-text rounded-bl-sm'}
                                 `}>
                                     {msg.text}
                                 </div>
-                            </div>
+                            </motion.div>
                         ))}
                         {isLoading && (
                             <div className="flex justify-start">
-                                 <div className="bg-surfaceHighlight rounded-2xl p-3 rounded-bl-none flex gap-1">
-                                    <span className="w-1.5 h-1.5 bg-textMuted rounded-full animate-bounce"></span>
-                                    <span className="w-1.5 h-1.5 bg-textMuted rounded-full animate-bounce delay-100"></span>
-                                    <span className="w-1.5 h-1.5 bg-textMuted rounded-full animate-bounce delay-200"></span>
+                                 <div className="bg-surfaceHighlight border border-border rounded-2xl px-4 py-3 rounded-bl-sm flex gap-1.5 items-center">
+                                    <span className="w-1.5 h-1.5 bg-textMuted/50 rounded-full animate-bounce"></span>
+                                    <span className="w-1.5 h-1.5 bg-textMuted/50 rounded-full animate-bounce delay-100"></span>
+                                    <span className="w-1.5 h-1.5 bg-textMuted/50 rounded-full animate-bounce delay-200"></span>
                                  </div>
                             </div>
                         )}
                         <div ref={chatEndRef} />
                     </div>
 
-                    <div className="p-4 border-t border-border bg-surface transition-colors duration-300">
-                        <div className="relative">
+                    <div className="p-5 border-t border-border bg-surface/50">
+                        <div className="relative group">
                             <input
                                 type="text"
                                 value={input}
@@ -302,12 +292,12 @@ const DocumentIntegrator: React.FC<DocumentIntegratorProps> = ({ documents, acti
                                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                                 disabled={!activeDoc}
                                 placeholder={activeDoc ? "Ask about specific clauses..." : "Select a document first..."}
-                                className="w-full bg-surfaceHighlight border border-border rounded-xl pl-4 pr-12 py-3 text-sm focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all placeholder:text-textMuted/50 text-text disabled:opacity-50"
+                                className="w-full bg-background border border-border rounded-xl pl-4 pr-12 py-3.5 text-sm focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all placeholder:text-textMuted/50 text-text shadow-sm"
                             />
                             <button 
                                 onClick={() => handleSend()}
                                 disabled={!input.trim() || isLoading || !activeDoc}
-                                className="absolute right-2 top-2 p-1.5 bg-primary rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
+                                className="absolute right-2 top-2 p-1.5 bg-primary rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-all shadow-md active:scale-95"
                             >
                                 <Send className="w-4 h-4" />
                             </button>
@@ -315,7 +305,6 @@ const DocumentIntegrator: React.FC<DocumentIntegratorProps> = ({ documents, acti
                     </div>
                 </div>
             </motion.div>
-
         </div>
     </div>
   );

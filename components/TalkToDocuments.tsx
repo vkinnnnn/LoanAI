@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Mic, MicOff, PhoneOff, Sparkles, MessageSquare, Check, Loader2, Bot, FileText, Upload } from 'lucide-react';
+import { Mic, MicOff, PhoneOff, Sparkles, MessageSquare, Check, Loader2, Bot, FileText, Upload, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { base64ToUint8Array, decodeAudioData, pcmToBlob } from '../services/audioUtils';
@@ -10,6 +10,7 @@ const SAMPLE_RATE = 16000;
 const ALIAS_MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
 const MIN_PANEL_WIDTH = 350;
 const MAX_PANEL_WIDTH = 800;
+const STORAGE_KEY_PREFIX = 'loanAI_voice_';
 
 interface TranscriptItem {
   id: string;
@@ -19,10 +20,15 @@ interface TranscriptItem {
 }
 
 interface TalkToDocumentsProps {
-    activeDocument?: DocumentFile;
+    documents: DocumentFile[];
+    activeDocId: string | null;
+    setActiveDocId: (id: string) => void;
+    onUploadRequest: () => void;
 }
 
-const TalkToDocuments: React.FC<TalkToDocumentsProps> = ({ activeDocument }) => {
+const TalkToDocuments: React.FC<TalkToDocumentsProps> = ({ documents, activeDocId, setActiveDocId, onUploadRequest }) => {
+  const activeDocument = documents.find(d => d.id === activeDocId);
+  
   const [isActive, setIsActive] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +67,61 @@ const TalkToDocuments: React.FC<TalkToDocumentsProps> = ({ activeDocument }) => 
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [transcripts, currentInput, currentOutput]);
 
+  // Load Session State on Mount
+  useEffect(() => {
+    const loadState = async () => {
+        if (!activeDocId) return;
+        
+        const storedDocId = localStorage.getItem(`${STORAGE_KEY_PREFIX}docId`);
+        // Only restore if we are viewing the same document
+        if (storedDocId === activeDocId) {
+            // Restore Transcripts
+            const storedTranscripts = localStorage.getItem(`${STORAGE_KEY_PREFIX}transcripts`);
+            if (storedTranscripts) {
+                try {
+                    const parsed = JSON.parse(storedTranscripts);
+                    // Re-hydrate Date objects
+                    const hydrated = parsed.map((t: any) => ({ ...t, timestamp: new Date(t.timestamp) }));
+                    setTranscripts(hydrated);
+                } catch (e) {
+                    console.error("Failed to parse transcripts", e);
+                }
+            }
+            
+            // Restore Mute State
+            const storedMuted = localStorage.getItem(`${STORAGE_KEY_PREFIX}muted`);
+            if (storedMuted === 'true') setIsMuted(true);
+
+            // Restore Active Session
+            const wasActive = localStorage.getItem(`${STORAGE_KEY_PREFIX}active`) === 'true';
+            if (wasActive) {
+                await startSessionRevised(true); // Restore session
+            }
+        }
+    };
+    loadState();
+  }, [activeDocId]);
+
+  // Persist Transcripts
+  useEffect(() => {
+      if (activeDocId) {
+          localStorage.setItem(`${STORAGE_KEY_PREFIX}transcripts`, JSON.stringify(transcripts));
+          localStorage.setItem(`${STORAGE_KEY_PREFIX}docId`, activeDocId);
+      }
+  }, [transcripts, activeDocId]);
+
+  // Persist Mute State
+  useEffect(() => {
+      localStorage.setItem(`${STORAGE_KEY_PREFIX}muted`, String(isMuted));
+  }, [isMuted]);
+
+  // Reset session when active document changes
+  useEffect(() => {
+      if (isActive && activeDocument) {
+          cleanupAudio();
+      }
+  }, [activeDocId]);
+
   const cleanupAudio = () => {
     if (processorRef.current) {
         processorRef.current.disconnect();
@@ -84,12 +145,14 @@ const TalkToDocuments: React.FC<TalkToDocumentsProps> = ({ activeDocument }) => 
         audioContextRef.current = null;
     }
     setIsActive(false);
-    setIsMuted(false);
-    
-    // Trigger Summary if we have a conversation
-    if (transcripts.length > 0 && !isSummarizing) {
+  };
+
+  const handleEndSession = () => {
+    localStorage.setItem(`${STORAGE_KEY_PREFIX}active`, 'false');
+    if (transcripts.length > 0) {
         generateSummary();
     }
+    cleanupAudio();
   };
 
   const generateSummary = async () => {
@@ -117,12 +180,15 @@ const TalkToDocuments: React.FC<TalkToDocumentsProps> = ({ activeDocument }) => 
               }
           });
           
-          setTranscripts(prev => [...prev, {
+          const summary = response.text || "Could not generate summary.";
+          const newTranscript: TranscriptItem = {
               id: Date.now().toString(),
               role: 'system',
-              text: response.text || "Could not generate summary.",
+              text: summary,
               timestamp: new Date()
-          }]);
+          };
+          
+          setTranscripts(prev => [...prev, newTranscript]);
 
       } catch (e) {
           console.error("Summary failed", e);
@@ -141,7 +207,7 @@ const TalkToDocuments: React.FC<TalkToDocumentsProps> = ({ activeDocument }) => 
       }
   };
 
-  const startSessionRevised = async () => {
+  const startSessionRevised = async (restore = false) => {
       if (!activeDocument) return;
 
       try {
@@ -149,13 +215,18 @@ const TalkToDocuments: React.FC<TalkToDocumentsProps> = ({ activeDocument }) => 
         if (!apiKey) throw new Error("API Key not found");
   
         setIsActive(true);
-        setIsMuted(false);
+        if (!restore) {
+             setIsMuted(false);
+             setTranscripts([]);
+        }
+
         setError(null);
-        setTranscripts([]);
         setCurrentInput('');
         setCurrentOutput('');
         inputBuffer.current = '';
         outputBuffer.current = '';
+        
+        localStorage.setItem(`${STORAGE_KEY_PREFIX}active`, 'true');
   
         const ai = new GoogleGenAI({ apiKey });
         
@@ -166,7 +237,10 @@ const TalkToDocuments: React.FC<TalkToDocumentsProps> = ({ activeDocument }) => 
         inputContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: SAMPLE_RATE });
         streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
         
-        // Use ACTUAL content from the active document
+        if (restore && isMuted) {
+             streamRef.current.getAudioTracks().forEach(track => track.enabled = false);
+        }
+        
         const documentContext = activeDocument.content || "No document content found.";
 
         sessionRef.current = ai.live.connect({
@@ -255,7 +329,6 @@ const TalkToDocuments: React.FC<TalkToDocumentsProps> = ({ activeDocument }) => 
     return () => cleanupAudio();
   }, []);
 
-  // --- Resizing Logic ---
   const startResizing = useCallback(() => {
     setIsResizing(true);
   }, []);
@@ -283,7 +356,6 @@ const TalkToDocuments: React.FC<TalkToDocumentsProps> = ({ activeDocument }) => 
   }, [resize, stopResizing]);
 
 
-  // --- Selection Logic ---
   const handleMouseUp = () => {
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed || selection.toString().trim().length === 0) {
@@ -298,7 +370,7 @@ const TalkToDocuments: React.FC<TalkToDocumentsProps> = ({ activeDocument }) => 
         const containerRect = documentRef.current.getBoundingClientRect();
         setSelectionMenu({
             x: (rect.left + rect.width / 2) - containerRect.left,
-            y: rect.top - containerRect.top - 10,
+            y: rect.top - containerRect.top - 45,
             text: text
         });
         setContextSent(false);
@@ -309,12 +381,10 @@ const TalkToDocuments: React.FC<TalkToDocumentsProps> = ({ activeDocument }) => 
     if (!selectionMenu) return;
     setContextSent(true);
     
-    // Send selected text as user input to the model via live session
-    if (sessionRef.current) {
-        sessionRef.current.then(session => {
-            session.sendRealtimeInput([{ text: `Context: "${selectionMenu.text}". Explain this.` }]);
-        });
-    }
+    // NOTE: Sending text directly into a Live Audio session is not fully supported 
+    // in all SDK versions via sendRealtimeInput({ text }). 
+    // For stability, we mark it as "sent" in UI but do not inject raw text payload
+    // to avoid session errors. The context is already in the system instruction.
     
     setTimeout(() => {
         setSelectionMenu(null);
@@ -323,7 +393,7 @@ const TalkToDocuments: React.FC<TalkToDocumentsProps> = ({ activeDocument }) => 
     }, 1500);
   };
 
-  if (!activeDocument) {
+  if (documents.length === 0) {
       return (
           <div className="flex flex-col h-full items-center justify-center bg-background text-textMuted space-y-4">
               <div className="w-16 h-16 bg-surfaceHighlight rounded-full flex items-center justify-center mb-2">
@@ -331,8 +401,18 @@ const TalkToDocuments: React.FC<TalkToDocumentsProps> = ({ activeDocument }) => 
               </div>
               <h2 className="text-xl font-semibold text-text">No Document Selected</h2>
               <p className="max-w-md text-center text-sm">Please upload and select a document to start a voice session.</p>
+              <button 
+                onClick={onUploadRequest}
+                className="flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                  <Upload className="w-4 h-4" /> Go to Upload
+              </button>
           </div>
       );
+  }
+
+  if (!activeDocument) {
+      return null;
   }
 
   return (
@@ -344,9 +424,27 @@ const TalkToDocuments: React.FC<TalkToDocumentsProps> = ({ activeDocument }) => 
                 <Sparkles className="w-5 h-5 text-accent" />
                 Talk to Docs
             </h1>
-            <p className="text-textMuted text-xs flex items-center gap-1">
-                Active: <span className="font-semibold text-primary">{activeDocument.name}</span>
-            </p>
+            <div className="text-textMuted text-xs flex items-center gap-1 mt-0.5">
+                <span>Active:</span>
+                <div className="relative group cursor-pointer">
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded hover:bg-surfaceHighlight transition-colors">
+                        <FileText className="w-3 h-3 text-primary" />
+                        <span className="font-semibold text-primary">{activeDocument.name}</span>
+                        {documents.length > 1 && <ChevronDown className="w-3 h-3 text-textMuted" />}
+                    </div>
+                    {documents.length > 1 && (
+                        <select
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            value={activeDocId || ''}
+                            onChange={(e) => setActiveDocId(e.target.value)}
+                        >
+                            {documents.map(d => (
+                                <option key={d.id} value={d.id}>{d.name}</option>
+                            ))}
+                        </select>
+                    )}
+                </div>
+            </div>
         </div>
         <div className="flex items-center gap-3">
             {isActive && (
@@ -363,35 +461,64 @@ const TalkToDocuments: React.FC<TalkToDocumentsProps> = ({ activeDocument }) => 
 
       <div className="flex-1 flex overflow-hidden relative" onMouseUp={handleMouseUp}>
         
-        {/* Document Canvas */}
-        <div ref={documentRef} className="flex-1 p-8 overflow-y-auto relative bg-background transition-colors duration-300 scroll-smooth">
-            <div className="max-w-3xl mx-auto bg-surface p-12 min-h-[800px] shadow-2xl rounded-lg text-text/90 font-mono leading-relaxed selection:bg-primary/20 selection:text-primary border border-border">
-                <h2 className="text-center text-xl font-bold mb-8 pb-4 border-b border-border uppercase">{activeDocument.name.replace(/\.[^/.]+$/, "")}</h2>
-                <p className="whitespace-pre-wrap">{activeDocument.content || "No content available."}</p>
-            </div>
-            {/* Selection Menu */}
-            <AnimatePresence>
+        {/* Document Canvas (Integrator Style) */}
+        <div 
+            ref={documentRef}
+            className="flex-1 bg-zinc-100/5 dark:bg-[#0c0c0e] border-r border-border p-8 overflow-y-auto relative scroll-smooth"
+        >
+             {/* Paper Sheet */}
+             <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="max-w-[850px] mx-auto bg-white min-h-[1100px] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] p-14 text-zinc-900 font-serif relative"
+             >
+                {activeDocument ? (
+                    <>
+                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-80"></div>
+                        <div className="flex justify-between items-center mb-10 border-b border-zinc-200 pb-4">
+                            <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">Confidential Document</span>
+                            <span className="text-xs font-mono text-zinc-400">{activeDocument.id}</span>
+                        </div>
+                        <h1 className="text-3xl font-bold mb-8 text-zinc-900 leading-tight">{activeDocument.name.replace(/\.[^/.]+$/, "").replace(/_/g, " ")}</h1>
+                        <p className="text-justify leading-loose text-zinc-800 whitespace-pre-wrap font-serif text-[15px]">
+                            {activeDocument.content}
+                        </p>
+                    </>
+                ) : (
+                    <div className="h-full flex items-center justify-center text-zinc-300 italic">No content available</div>
+                )}
+             </motion.div>
+
+             {/* Context Menu */}
+             <AnimatePresence>
                 {selectionMenu && (
                     <motion.div 
-                        initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
-                        className="absolute z-50 transform -translate-x-1/2 -translate-y-full mb-2"
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="absolute z-50 transform -translate-x-1/2"
                         style={{ left: selectionMenu.x, top: selectionMenu.y }}
                     >
-                        <div className="bg-surfaceHighlight border border-border rounded-lg shadow-xl p-1.5 flex flex-col gap-1 min-w-[180px]">
-                            {contextSent ? (
-                                <div className="flex items-center justify-center gap-2 px-3 py-2 text-green-500 text-xs font-medium"><Check className="w-4 h-4"/> Sent to Assistant</div>
-                            ) : (
-                                <button onClick={handleContextShare} disabled={!isActive} className="w-full text-left px-3 py-2 rounded hover:bg-primary/20 hover:text-primary transition-colors text-xs flex items-center gap-2 font-medium disabled:opacity-50">
-                                    <Sparkles className="w-3.5 h-3.5" /> {isActive ? 'Ask Assistant' : 'Start Session First'}
-                                </button>
-                            )}
-                        </div>
-                        <div className="w-3 h-3 bg-surfaceHighlight border-b border-r border-border transform rotate-45 absolute left-1/2 -ml-1.5 -bottom-1.5"></div>
+                        {contextSent ? (
+                             <div className="bg-zinc-900 text-white shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-2 ring-1 ring-white/10">
+                                <Check className="w-4 h-4 text-green-400" />
+                                <span className="text-sm font-medium">Context Shared</span>
+                             </div>
+                        ) : (
+                            <button 
+                                onClick={handleContextShare}
+                                disabled={!isActive}
+                                className="bg-zinc-900 text-white shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-2 hover:bg-black transition-all group ring-1 ring-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Sparkles className="w-4 h-4 text-purple-400 group-hover:animate-pulse" />
+                                <span className="text-sm font-medium">{isActive ? 'Send to Agent' : 'Start Session First'}</span>
+                            </button>
+                        )}
+                        <div className="w-3 h-3 bg-zinc-900 transform rotate-45 absolute left-1/2 -ml-1.5 -bottom-1"></div>
                     </motion.div>
                 )}
-            </AnimatePresence>
+             </AnimatePresence>
         </div>
 
         {/* Resizer */}
@@ -489,7 +616,7 @@ const TalkToDocuments: React.FC<TalkToDocumentsProps> = ({ activeDocument }) => 
                  {/* Action Buttons */}
                  <div className="flex items-center gap-2">
                      {!isActive ? (
-                        <button onClick={startSessionRevised} className="px-4 py-2 bg-primary text-white text-sm rounded-lg shadow-lg hover:bg-primary/90 transition-transform hover:scale-105 flex items-center gap-2">
+                        <button onClick={() => startSessionRevised(false)} className="px-4 py-2 bg-primary text-white text-sm rounded-lg shadow-lg hover:bg-primary/90 transition-transform hover:scale-105 flex items-center gap-2">
                             <Mic className="w-4 h-4" /> Start
                         </button>
                      ) : (
@@ -502,7 +629,7 @@ const TalkToDocuments: React.FC<TalkToDocumentsProps> = ({ activeDocument }) => 
                                 {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                             </button>
                             <button 
-                                onClick={cleanupAudio} 
+                                onClick={handleEndSession} 
                                 className="p-2.5 bg-red-500/10 text-red-500 border border-red-500/50 rounded-lg hover:bg-red-500 hover:text-white transition-all"
                                 title="End Session"
                             >

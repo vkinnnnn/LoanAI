@@ -1,7 +1,8 @@
+
 export enum ViewMode {
   TALK_TO_DOCS = 'TALK_TO_DOCS',
   UPLOAD = 'UPLOAD',
-  INTEGRATOR = 'INTEGRATOR'
+  COPILOT = 'COPILOT'
 }
 
 export interface DocumentFile {

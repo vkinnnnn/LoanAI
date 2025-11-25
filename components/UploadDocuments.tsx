@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Upload, FileText, CheckCircle2, Loader2, X, Trash2, ArrowRight } from 'lucide-react';
+
+import React, { useState, useRef, useEffect } from 'react';
+import { Upload, FileText, CheckCircle2, Loader2, X, Trash2, File, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DocumentFile } from '../types';
 import { MOCK_LOAN_DOC_CONTENT } from '../services/gemini';
@@ -12,6 +13,16 @@ interface UploadDocumentsProps {
 
 const UploadDocuments: React.FC<UploadDocumentsProps> = ({ documents, setDocuments, onUpload }) => {
   const [dragActive, setDragActive] = useState(false);
+  const divRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [opacity, setOpacity] = useState(0);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!divRef.current) return;
+    const div = divRef.current;
+    const rect = div.getBoundingClientRect();
+    setPosition({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+  };
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -40,16 +51,13 @@ const UploadDocuments: React.FC<UploadDocumentsProps> = ({ documents, setDocumen
         size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
         type: file.type,
         status: 'uploading',
-        uploadDate: 'Just now',
-        // In a real app, this would be the result of the backend OCR
+        uploadDate: new Date().toLocaleDateString(),
         content: `Content for ${file.name}\n\n${MOCK_LOAN_DOC_CONTENT}`, 
         accuracy: 0
     }));
 
-    // Add to global state immediately as 'uploading'
     onUpload(newDocs);
 
-    // Simulate individual processing
     newDocs.forEach(doc => {
         setTimeout(() => {
             setDocuments(prev => prev.map(f => f.id === doc.id ? {...f, status: 'processing'} : f));
@@ -65,128 +73,172 @@ const UploadDocuments: React.FC<UploadDocumentsProps> = ({ documents, setDocumen
     setDocuments(prev => prev.filter(f => f.id !== id));
   };
 
-  const handleClearAll = () => {
-    setDocuments([]);
-  };
-
   const getStatusColor = (status: string) => {
       switch(status) {
-          case 'ready': return 'text-green-400 bg-green-400/10 border-green-400/20';
-          case 'processing': return 'text-primary bg-primary/10 border-primary/20';
+          case 'ready': return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20';
+          case 'processing': return 'text-blue-400 bg-blue-400/10 border-blue-400/20';
           case 'error': return 'text-red-400 bg-red-400/10 border-red-400/20';
-          default: return 'text-textMuted bg-surfaceHighlight';
+          default: return 'text-zinc-500 bg-zinc-500/10';
       }
   };
 
   return (
-    <div className="h-full bg-background p-8 overflow-y-auto transition-colors duration-300">
-      <div className="max-w-5xl mx-auto">
+    <div className="h-full bg-background p-8 overflow-y-auto">
+      <div className="max-w-5xl mx-auto space-y-10">
         
-        <div className="mb-8">
-            <h1 className="text-3xl font-bold text-text mb-2">Upload Documents</h1>
-            <p className="text-textMuted">Ingest loan documents. These will be used as context for the Voice Agent and Integrator.</p>
+        {/* Header */}
+        <div className="space-y-2">
+            <h1 className="text-3xl font-bold text-text tracking-tight">Upload Documents</h1>
+            <p className="text-textMuted max-w-2xl text-sm leading-relaxed">
+                Ingest loan documents (PDF, Images) to initialize the extraction pipeline. 
+                These files serve as the context layer for the <span className="text-primary">Voice Agent</span> and <span className="text-accent">CoPilot</span>.
+            </p>
         </div>
 
-        {/* Drag Drop Zone */}
+        {/* Spotlight Drag Drop Zone */}
         <div 
+            ref={divRef}
+            onMouseMove={handleMouseMove}
+            onMouseEnter={() => setOpacity(1)}
+            onMouseLeave={() => setOpacity(0)}
             className={`
-                relative h-48 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center transition-all duration-300
-                ${dragActive ? 'border-primary bg-primary/5 scale-[1.01]' : 'border-border bg-surface hover:border-textMuted'}
+                relative h-32 rounded-xl flex flex-col items-center justify-center transition-all duration-300 cursor-pointer overflow-hidden group
+                ${dragActive ? 'bg-primary/5 scale-[1.01]' : 'bg-surface/50 hover:bg-surface'}
             `}
+            style={{
+                boxShadow: '0 0 0 1px var(--color-border)',
+            }}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
             onDragOver={handleDrag}
             onDrop={handleDrop}
+            onClick={() => document.getElementById('file-upload')?.click()}
         >
+             {/* Spotlight Gradient */}
+             <div
+                className="pointer-events-none absolute -inset-px opacity-0 transition duration-300 group-hover:opacity-100"
+                style={{
+                    background: `radial-gradient(600px circle at ${position.x}px ${position.y}px, rgba(59, 130, 246, 0.15), transparent 40%)`,
+                }}
+             />
+
              <input 
+                id="file-upload"
                 type="file" 
                 multiple
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                className="hidden" 
                 onChange={(e) => {
                     if (e.target.files) {
                         processFiles(Array.from(e.target.files));
                     }
                 }}
              />
-             <div className="w-12 h-12 rounded-full bg-surfaceHighlight flex items-center justify-center mb-3 text-primary">
-                <Upload className="w-6 h-6" />
+             <div className="flex flex-col items-center gap-3 z-10">
+                <div className={`
+                    w-12 h-12 rounded-full flex items-center justify-center transition-all duration-500
+                    ${dragActive ? 'bg-primary text-white shadow-lg shadow-primary/40' : 'bg-surfaceHighlight text-textMuted group-hover:text-primary group-hover:scale-110'}
+                `}>
+                    <Upload className="w-5 h-5" />
+                </div>
+                <div className="text-center space-y-1">
+                    <h3 className="text-sm font-semibold text-text">Click or drag files to upload</h3>
+                    <p className="text-xs text-textMuted font-mono">PDF, PNG, JPG (Max 50MB)</p>
+                </div>
              </div>
-             <h3 className="text-base font-medium text-text mb-1">Drag & drop files here</h3>
-             <p className="text-xs text-textMuted">Supported: PDF, JPG, PNG (Max 50MB)</p>
         </div>
 
-        {/* File List */}
-        <div className="mt-8">
-            <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold flex items-center gap-2 text-text">
-                    Uploaded Context
-                    {documents.length > 0 && <span className="text-xs font-normal text-textMuted bg-surfaceHighlight px-2 py-1 rounded-full">{documents.length}</span>}
+        {/* Uploaded Context Section */}
+        <div className="space-y-4">
+            <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold flex items-center gap-2 text-text">
+                    Uploaded Context <span className="text-xs font-normal text-textMuted ml-2 bg-surfaceHighlight px-2 py-0.5 rounded-full">{documents.length}</span>
                 </h2>
                 {documents.length > 0 && (
                     <button 
-                        onClick={handleClearAll}
-                        className="text-xs text-textMuted hover:text-red-400 flex items-center gap-1 transition-colors px-2 py-1 rounded hover:bg-surfaceHighlight"
+                        onClick={() => setDocuments([])}
+                        className="text-xs font-medium text-textMuted hover:text-red-400 flex items-center gap-1.5 transition-colors px-3 py-1.5 rounded-md hover:bg-red-400/10"
                     >
                         <Trash2 className="w-3.5 h-3.5" /> Clear All
                     </button>
                 )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <AnimatePresence mode="popLayout">
-                    {documents.map((file) => (
-                        <motion.div 
-                            key={file.id}
-                            layout
-                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-                            className="bg-surface border border-border rounded-xl p-4 flex items-start gap-4 hover:border-primary/30 transition-colors group relative"
-                        >
-                            <div className="w-10 h-10 rounded-lg bg-surfaceHighlight flex items-center justify-center shrink-0">
-                                <FileText className="w-5 h-5 text-textMuted group-hover:text-primary transition-colors" />
-                            </div>
-                            
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-start justify-between mb-0.5">
-                                    <h4 className="font-medium text-sm text-text truncate pr-4">{file.name}</h4>
-                                    <button 
-                                        onClick={(e) => handleRemoveFile(e, file.id)}
-                                        className="p-1 -mr-1 rounded-md text-textMuted hover:text-red-400 hover:bg-red-400/10 transition-colors"
-                                        title="Remove file"
-                                    >
-                                        <X className="w-3.5 h-3.5" />
-                                    </button>
-                                </div>
-                                <p className="text-[10px] text-textMuted mb-2">{file.size} • {file.uploadDate}</p>
-                                
-                                <div className="flex items-center justify-between">
-                                    <span className={`text-[10px] px-2 py-0.5 rounded-full border flex items-center gap-1.5 ${getStatusColor(file.status)}`}>
-                                        {file.status === 'processing' && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
-                                        {file.status === 'ready' && <CheckCircle2 className="w-2.5 h-2.5" />}
-                                        {file.status.toUpperCase()}
-                                    </span>
-                                    
-                                    {file.accuracy && (
-                                        <span className="text-[10px] font-mono text-textMuted">
-                                            Accuracy: <span className="text-green-400">{file.accuracy.toFixed(1)}%</span>
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                        </motion.div>
-                    ))}
-                </AnimatePresence>
+            {/* Table Format List */}
+            <div className="border border-border rounded-xl bg-surface/30 backdrop-blur-sm overflow-hidden min-h-[300px] flex flex-col relative">
                 
-                {documents.length === 0 && (
-                    <motion.div 
-                        initial={{ opacity: 0 }} 
-                        animate={{ opacity: 1 }}
-                        className="col-span-full py-12 text-center border border-dashed border-border rounded-xl bg-surface/30"
-                    >
-                        <p className="text-textMuted text-sm mb-2">No documents in context.</p>
-                        <p className="text-xs text-textMuted opacity-50">Upload files to start analyzing.</p>
-                    </motion.div>
+                {documents.length === 0 ? (
+                    /* Empty State */
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-textMuted/40 space-y-3">
+                         <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-border flex items-center justify-center">
+                             <File className="w-8 h-8 opacity-50" />
+                         </div>
+                        <p className="text-sm font-medium">No context loaded</p>
+                    </div>
+                ) : (
+                    <div className="w-full">
+                        {/* Table Header */}
+                        <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-border bg-surfaceHighlight/30 text-[11px] font-bold text-textMuted uppercase tracking-wider">
+                            <div className="col-span-5">File Name</div>
+                            <div className="col-span-2">Size</div>
+                            <div className="col-span-2">Date</div>
+                            <div className="col-span-2">Status</div>
+                            <div className="col-span-1 text-right"></div>
+                        </div>
+                        
+                        {/* Table Rows */}
+                        <div className="divide-y divide-border/50">
+                            <AnimatePresence mode="popLayout">
+                                {documents.map((file, i) => (
+                                    <motion.div 
+                                        key={file.id}
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.95 }}
+                                        transition={{ delay: i * 0.05 }}
+                                        className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-white/[0.02] transition-colors text-sm group"
+                                    >
+                                        {/* Name */}
+                                        <div className="col-span-5 flex items-center gap-4 overflow-hidden">
+                                            <div className="w-10 h-10 rounded-lg bg-surfaceHighlight border border-border flex items-center justify-center shrink-0">
+                                                <FileText className="w-5 h-5 text-primary" strokeWidth={1.5} />
+                                            </div>
+                                            <div className="flex flex-col min-w-0">
+                                                <span className="truncate font-medium text-text group-hover:text-primary transition-colors">{file.name}</span>
+                                                <span className="text-[10px] text-textMuted md:hidden">{file.size}</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Size */}
+                                        <div className="col-span-2 text-textMuted text-xs font-mono hidden md:block">{file.size}</div>
+
+                                        {/* Date */}
+                                        <div className="col-span-2 text-textMuted text-xs hidden md:block">{file.uploadDate}</div>
+
+                                        {/* Status */}
+                                        <div className="col-span-3 md:col-span-2">
+                                             <span className={`text-[10px] px-2.5 py-1 rounded-full border inline-flex items-center gap-1.5 font-medium shadow-sm ${getStatusColor(file.status)}`}>
+                                                {file.status === 'processing' && <Loader2 className="w-3 h-3 animate-spin" />}
+                                                {file.status === 'ready' && <CheckCircle2 className="w-3 h-3" />}
+                                                {file.status === 'error' && <AlertCircle className="w-3 h-3" />}
+                                                {file.status.toUpperCase()}
+                                            </span>
+                                        </div>
+
+                                        {/* Actions */}
+                                        <div className="col-span-2 md:col-span-1 flex justify-end">
+                                            <button 
+                                                onClick={(e) => handleRemoveFile(e, file.id)}
+                                                className="p-2 rounded-lg text-textMuted hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover:opacity-100"
+                                                title="Remove file"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+                        </div>
+                    </div>
                 )}
             </div>
         </div>
