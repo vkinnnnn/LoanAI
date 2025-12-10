@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Upload, FileText, CheckCircle2, Loader2, X, Trash2, File, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DocumentFile } from '../types';
-import { MOCK_LOAN_DOC_CONTENT } from '../services/gemini';
+import { api } from '../services/api';
 
 interface UploadDocumentsProps {
     documents: DocumentFile[];
@@ -44,7 +44,8 @@ const UploadDocuments: React.FC<UploadDocumentsProps> = ({ documents, setDocumen
     }
   };
 
-  const processFiles = (uploadedFiles: File[]) => {
+  const processFiles = async (uploadedFiles: File[]) => {
+    // 1. Create initial entries with "uploading" status
     const newDocs: DocumentFile[] = uploadedFiles.map(file => ({
         id: Math.random().toString(36).substr(2, 9),
         name: file.name,
@@ -52,20 +53,36 @@ const UploadDocuments: React.FC<UploadDocumentsProps> = ({ documents, setDocumen
         type: file.type,
         status: 'uploading',
         uploadDate: new Date().toLocaleDateString(),
-        content: `Content for ${file.name}\n\n${MOCK_LOAN_DOC_CONTENT}`, 
+        content: '', 
         accuracy: 0
     }));
 
+    // Update state to show loading immediately
     onUpload(newDocs);
 
-    newDocs.forEach(doc => {
-        setTimeout(() => {
-            setDocuments(prev => prev.map(f => f.id === doc.id ? {...f, status: 'processing'} : f));
-            setTimeout(() => {
-                setDocuments(prev => prev.map(f => f.id === doc.id ? {...f, status: 'ready', accuracy: Math.random() * (98 - 90) + 90} : f));
-            }, 2000);
-        }, 800);
-    });
+    // 2. Process each file via Backend API
+    for (let i = 0; i < uploadedFiles.length; i++) {
+        const file = uploadedFiles[i];
+        const docId = newDocs[i].id;
+
+        // Set to processing
+        setDocuments(prev => prev.map(d => d.id === docId ? { ...d, status: 'processing' } : d));
+
+        try {
+            // CALL REAL BACKEND
+            const result = await api.uploadDocument(file);
+            
+            setDocuments(prev => prev.map(d => d.id === docId ? { 
+                ...d, 
+                status: 'ready', 
+                content: result.content,
+                accuracy: result.accuracy
+            } : d));
+        } catch (error) {
+            console.error(`Failed to process ${file.name}`, error);
+            setDocuments(prev => prev.map(d => d.id === docId ? { ...d, status: 'error' } : d));
+        }
+    }
   };
 
   const handleRemoveFile = (e: React.MouseEvent, id: string) => {
