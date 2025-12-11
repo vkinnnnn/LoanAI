@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { ViewMode } from '../types';
-import { Mic, FileUp, Sparkles, Bot, Settings, Menu, Sun, Moon, Lock, ScanLine } from 'lucide-react';
+import { FileUp, Bot, Settings, Menu, Sun, Moon, Lock, ScanEye } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface SidebarProps {
@@ -12,13 +12,13 @@ interface SidebarProps {
   theme: 'dark' | 'light';
   toggleTheme: () => void;
   hasDocuments: boolean;
+  onLogoClick: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange, isOpen, toggleSidebar, theme, toggleTheme, hasDocuments }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange, isOpen, toggleSidebar, theme, toggleTheme, hasDocuments, onLogoClick }) => {
   const menuItems = [
-    { id: ViewMode.TALK_TO_DOCS, label: 'Talk to Docs', icon: Mic, desc: 'Voice Agent Analysis' },
-    { id: ViewMode.UPLOAD, label: 'Upload', icon: FileUp, desc: 'Ingest Loan Data' },
-    { id: ViewMode.COPILOT, label: 'CoPilot', icon: Sparkles, desc: 'Deep Analysis' },
+    { id: ViewMode.ASSISTANT, label: 'Loan Assistant', icon: Bot, desc: 'Voice & Text Intelligence' },
+    { id: ViewMode.UPLOAD, label: 'Upload Documents', icon: FileUp, desc: 'Ingest Loan Data' },
   ];
 
   return (
@@ -26,29 +26,50 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange, isOpen, to
       className={`h-screen bg-surface/95 backdrop-blur-xl border-r border-border flex flex-col z-20 transition-all duration-500 ease-in-out ${isOpen ? 'w-64' : 'w-20'}`}
       initial={false}
     >
-      <div className={`p-4 flex items-center ${isOpen ? 'justify-between' : 'justify-center'} h-16 mb-4`}>
-        {isOpen && (
-           <motion.div 
-             initial={{ opacity: 0, x: -10 }} 
-             animate={{ opacity: 1, x: 0 }}
-             className="flex items-center gap-3"
-           >
-             <div className="w-8 h-8 rounded-lg bg-primary/20 border border-primary/20 flex items-center justify-center shadow-inner">
-                <ScanLine className="text-primary w-5 h-5" />
-             </div>
-             <span className="font-bold text-lg tracking-tight text-text font-sans">LoanSight</span>
-           </motion.div>
-        )}
+      {/* Brand Header */}
+      <div className={`p-4 flex ${isOpen ? 'flex-row items-center justify-between' : 'flex-col items-center gap-6'} mb-2 transition-all duration-300`}>
+        <button 
+            onClick={onLogoClick}
+            className={`flex items-center gap-3 group focus:outline-none ${!isOpen ? 'justify-center w-full mt-2' : ''}`}
+            title="Back to Landing Page"
+        >
+            {/* Logo Icon */}
+            <div className="relative w-10 h-10 flex items-center justify-center shrink-0">
+                <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 to-accent/20 rounded-xl blur-sm group-hover:blur-md transition-all duration-500 opacity-50 group-hover:opacity-100"></div>
+                <div className="relative bg-surfaceHighlight/50 border border-white/10 w-10 h-10 rounded-xl flex items-center justify-center shadow-inner overflow-hidden group-hover:border-primary/50 transition-colors">
+                     <ScanEye className="w-6 h-6 text-primary group-hover:scale-110 transition-transform duration-500" strokeWidth={1.5} />
+                </div>
+            </div>
+
+            {/* Logo Text */}
+            {isOpen && (
+               <motion.div 
+                 initial={{ opacity: 0, x: -10 }} 
+                 animate={{ opacity: 1, x: 0 }}
+                 className="flex flex-col items-start"
+               >
+                 <div className="flex items-center">
+                    <span className="font-bold text-xl tracking-tight text-text leading-none font-sans">Loan</span>
+                    <span className="font-bold text-xl tracking-tight text-primary leading-none font-sans">Sight</span>
+                 </div>
+                 <span className="text-[9px] text-textMuted font-mono tracking-[0.25em] uppercase leading-none mt-1 group-hover:text-primary/70 transition-colors">
+                    Intelligence
+                 </span>
+               </motion.div>
+            )}
+        </button>
+        
+        {/* Toggle Button */}
         <button 
           onClick={toggleSidebar}
-          className="p-2 hover:bg-surfaceHighlight rounded-lg text-textMuted hover:text-text transition-all duration-200 active:scale-95"
+          className={`p-1.5 rounded-lg text-textMuted hover:text-text hover:bg-surfaceHighlight transition-all duration-200 active:scale-95 ${!isOpen ? '' : ''}`}
           aria-label="Toggle Sidebar"
         >
           <Menu className="w-5 h-5" />
         </button>
       </div>
 
-      <nav className="flex-1 py-2 px-3 space-y-1">
+      <nav className="flex-1 py-2 px-3 space-y-1 mt-2">
         {menuItems.map((item) => {
           const isActive = currentView === item.id;
           const isRestricted = !hasDocuments && item.id !== ViewMode.UPLOAD;

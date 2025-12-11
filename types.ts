@@ -1,8 +1,7 @@
 
 export enum ViewMode {
-  TALK_TO_DOCS = 'TALK_TO_DOCS',
-  UPLOAD = 'UPLOAD',
-  COPILOT = 'COPILOT'
+  ASSISTANT = 'ASSISTANT', // Unified Voice + Chat
+  UPLOAD = 'UPLOAD'
 }
 
 export interface DocumentFile {
@@ -17,9 +16,12 @@ export interface DocumentFile {
 }
 
 export interface ChatMessage {
-  role: 'user' | 'model';
+  id: string;
+  role: 'user' | 'model' | 'system';
   text: string;
   timestamp: Date;
+  mode?: 'voice' | 'text'; // Track how the message was generated
+  isStreaming?: boolean;
 }
 
 export interface AudioVisualizerProps {

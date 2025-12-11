@@ -1,9 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
-import TalkToDocuments from './components/TalkToDocuments';
 import UploadDocuments from './components/UploadDocuments';
-import DocumentIntegrator from './components/DocumentIntegrator';
+import LoanAssistant from './components/LoanAssistant';
 import LandingPage from './components/LandingPage';
 import { ViewMode, DocumentFile } from './types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -67,9 +66,9 @@ const App: React.FC = () => {
 
   const renderView = () => {
     switch (currentView) {
-      case ViewMode.TALK_TO_DOCS:
+      case ViewMode.ASSISTANT:
         return (
-            <TalkToDocuments 
+            <LoanAssistant 
                 documents={documents}
                 activeDocId={activeDocId}
                 setActiveDocId={setActiveDocId}
@@ -82,15 +81,6 @@ const App: React.FC = () => {
                 documents={documents} 
                 setDocuments={setDocuments} 
                 onUpload={handleUploadFiles}
-            />
-        );
-      case ViewMode.COPILOT:
-        return (
-            <DocumentIntegrator 
-                documents={documents}
-                activeDocId={activeDocId}
-                setActiveDocId={setActiveDocId}
-                onUploadRequest={() => setCurrentView(ViewMode.UPLOAD)}
             />
         );
       default:
@@ -122,6 +112,7 @@ const App: React.FC = () => {
         theme={theme}
         toggleTheme={toggleTheme}
         hasDocuments={documents.length > 0}
+        onLogoClick={() => setShowLanding(true)}
       />
       
       <main className="flex-1 relative flex flex-col min-w-0 z-10">
