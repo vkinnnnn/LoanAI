@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
     Send, Mic, MicOff, Sparkles, Upload, PanelRightClose, PanelRightOpen,
     Loader2, Volume2, Globe, Copy, BrainCircuit, ScanLine, Maximize2, X,
-    FileText, Bot
+    FileText, Bot, Play, Pause, FastForward, Check, ChevronDown, BookOpen, AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
@@ -28,6 +28,14 @@ const SUGGESTED_QUESTIONS = [
     "Explain the default clause"
 ];
 
+const LANGUAGES = [
+    { code: 'Spanish', label: 'Español', flag: '🇪🇸' },
+    { code: 'Hindi', label: 'हिंदी', flag: '🇮🇳' },
+    { code: 'French', label: 'Français', flag: '🇫🇷' },
+    { code: 'Chinese', label: '中文', flag: '🇨🇳' },
+    { code: 'German', label: 'Deutsch', flag: '🇩🇪' },
+];
+
 const LoanAssistant: React.FC<LoanAssistantProps> = ({ documents, activeDocId, setActiveDocId, onUploadRequest }) => {
     const activeDoc = documents.find(d => d.id === activeDocId);
     
@@ -37,6 +45,17 @@ const LoanAssistant: React.FC<LoanAssistantProps> = ({ documents, activeDocId, s
     const [input, setInput] = useState('');
     const chatEndRef = useRef<HTMLDivElement>(null);
 
+    // Selection State
+    const [selectedText, setSelectedText] = useState<string | null>(null);
+    const [showTranslateMenu, setShowTranslateMenu] = useState(false);
+
+    // TTS State
+    const [isReading, setIsReading] = useState(false);
+    const [isPaused, setIsPaused] = useState(false);
+    const [readingSpeed, setReadingSpeed] = useState(1);
+    const synthRef = useRef<SpeechSynthesis | null>(null);
+    const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+
     // Chat State
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isLoadingText, setIsLoadingText] = useState(false);
@@ -45,7 +64,7 @@ const LoanAssistant: React.FC<LoanAssistantProps> = ({ documents, activeDocId, s
     const [isVoiceActive, setIsVoiceActive] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
     
-    // Audio Refs
+    // Audio Refs (Live API)
     const audioContextRef = useRef<AudioContext | null>(null);
     const inputContextRef = useRef<AudioContext | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
@@ -63,11 +82,14 @@ const LoanAssistant: React.FC<LoanAssistantProps> = ({ documents, activeDocId, s
     // Auto-scroll
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, streamedInput, streamedOutput, isLoadingText]);
+    }, [messages, streamedInput, streamedOutput, isLoadingText, selectedText]);
 
     // Cleanup Audio on Unmount
     useEffect(() => {
-        return () => cleanupAudio();
+        return () => {
+            cleanupAudio();
+            stopReading();
+        };
     }, []);
 
     // Initial Welcome Message
@@ -76,12 +98,128 @@ const LoanAssistant: React.FC<LoanAssistantProps> = ({ documents, activeDocId, s
             setMessages([{
                 id: 'welcome',
                 role: 'model',
-                text: `I've loaded **${activeDoc.name}**. \n\nYou can ask me questions via **Text** or toggle **Voice Mode** to have a conversation.`,
+                text: `I've loaded **${activeDoc.name}**. \n\nYou can ask me questions via **Text**, toggle **Voice Mode**, or **Select Text** in the document to Explain, Translate, or Read it aloud.`,
                 timestamp: new Date(),
                 mode: 'text'
             }]);
         }
     }, [activeDoc?.id]);
+
+    // --- TTS HANDLING (Web Speech API) ---
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            synthRef.current = window.speechSynthesis;
+        }
+    }, []);
+
+    const startReading = (text: string) => {
+        if (!synthRef.current) return;
+        
+        // Stop any current speaking
+        synthRef.current.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = readingSpeed;
+        utterance.pitch = 1.0;
+        
+        // Attempt to find a "Google" voice or a decent default
+        const voices = synthRef.current.getVoices();
+        const preferredVoice = voices.find(v => v.name.includes('Google') && v.lang.startsWith('en')) || voices.find(v => v.lang.startsWith('en'));
+        if (preferredVoice) utterance.voice = preferredVoice;
+
+        utterance.onend = () => {
+            setIsReading(false);
+            setIsPaused(false);
+        };
+
+        utteranceRef.current = utterance;
+        synthRef.current.speak(utterance);
+        setIsReading(true);
+        setIsPaused(false);
+    };
+
+    const stopReading = () => {
+        if (synthRef.current) {
+            synthRef.current.cancel();
+            setIsReading(false);
+            setIsPaused(false);
+        }
+    };
+
+    const togglePause = () => {
+        if (!synthRef.current) return;
+        if (synthRef.current.paused) {
+            synthRef.current.resume();
+            setIsPaused(false);
+        } else {
+            synthRef.current.pause();
+            setIsPaused(true);
+        }
+    };
+
+    const changeSpeed = () => {
+        const speeds = [0.5, 1, 1.5, 2];
+        const currentIndex = speeds.indexOf(readingSpeed);
+        const nextSpeed = speeds[(currentIndex + 1) % speeds.length];
+        setReadingSpeed(nextSpeed);
+        
+        // If currently reading, restart with new speed at current position? 
+        // Web Speech API doesn't support seeking easily. 
+        // For simple UX, we'll just update state for next read or restart if user wants.
+        // Actually, updating rate on the fly isn't supported by all browsers on the active utterance.
+        // We will just set it for the next utterance or restart if we want to be fancy, 
+        // but for now let's just update the indicator.
+        
+        if (isReading) {
+            stopReading();
+            // Optionally auto-restart:
+            if (selectedText) setTimeout(() => startReading(selectedText), 100);
+        }
+    };
+
+    // --- SELECTION HANDLING ---
+    const handleDocumentMouseUp = () => {
+        const selection = window.getSelection();
+        if (selection && selection.toString().trim().length > 0) {
+            const text = selection.toString();
+            setSelectedText(text);
+            // Ensure panel is open to show the context actions
+            if (!isPanelOpen) setIsPanelOpen(true);
+        } else {
+            // Optional: Auto-clear selection if clicking empty space? 
+            // Better to keep it until manually dismissed or new selection to avoid frustration.
+        }
+    };
+
+    const clearSelection = () => {
+        setSelectedText(null);
+        window.getSelection()?.removeAllRanges();
+        stopReading();
+    };
+
+    // --- ACTION BUTTON HANDLERS ---
+    
+    const handleExplain = () => {
+        if (!selectedText) return;
+        const prompt = `Explain this clause from the document in plain English, highlighting any risks:\n\n"${selectedText}"`;
+        handleSendText(prompt, `Explain: "${selectedText.substring(0, 30)}..."`);
+        // We keep the selection active so they can still read it aloud etc, or clear it?
+        // Let's clear it to show the chat moving forward.
+        clearSelection();
+    };
+
+    const handleTranslate = (targetLang: string) => {
+        if (!selectedText) return;
+        const prompt = `Translate the following text to ${targetLang}. Maintain financial accuracy for terms like APR, Escrow, etc.\n\n"${selectedText}"`;
+        handleSendText(prompt, `Translate to ${targetLang}: "${selectedText.substring(0, 30)}..."`);
+        setShowTranslateMenu(false);
+        clearSelection();
+    };
+
+    const handleReadAloud = () => {
+        if (!selectedText) return;
+        startReading(selectedText);
+    };
 
     // --- AUDIO HANDLING ---
 
@@ -222,39 +360,30 @@ const LoanAssistant: React.FC<LoanAssistantProps> = ({ documents, activeDocId, s
 
     const toggleMute = () => {
         setIsMuted(!isMuted);
-        streamRef.current?.getAudioTracks().forEach(t => t.enabled = isMuted); // Logic inverted: if isMuted is true, enabling it makes it false. Wait.
-        // Actually: if currently muted, we want to unmute (enable=true).
-        // Correct logic: t.enabled = !isMuted (which is the new state? No.)
-        // Let's rely on state update.
         if (streamRef.current) {
-            streamRef.current.getAudioTracks().forEach(t => t.enabled = isMuted); // If isMuted was true, now it's false, so enable.
+            streamRef.current.getAudioTracks().forEach(t => t.enabled = isMuted);
         }
     };
 
     // --- TEXT HANDLING ---
 
-    const handleSendText = async (textOverride?: string) => {
-        const text = textOverride || input;
+    const handleSendText = async (text: string, displayOverride?: string) => {
         if (!text.trim() || !activeDoc) return;
-
-        // If Voice is active, we could sendRealtimeInput, but for reliability we'll pause voice or just use text API separate.
-        // For this unified UX, we'll just treat text as a separate channel into the same history.
         
         const newMessage: ChatMessage = {
             id: Date.now().toString(),
             role: 'user',
-            text: text,
+            text: displayOverride || text,
             timestamp: new Date(),
             mode: 'text'
         };
 
         setMessages(prev => [...prev, newMessage]);
-        if (!textOverride) setInput('');
+        if (!displayOverride) setInput('');
         setIsLoadingText(true);
 
         try {
             const ai = createGeminiClient();
-            // Build context from previous messages (simple)
             const history = messages.slice(-10).map(m => `${m.role === 'user' ? 'User' : 'Model'}: ${m.text}`).join('\n');
             
             const prompt = `
@@ -263,9 +392,12 @@ const LoanAssistant: React.FC<LoanAssistantProps> = ({ documents, activeDocId, s
             Chat History:
             ${history}
             
-            User Question: ${text}
+            User Request: ${text}
             
-            Answer as a helpful Loan Assistant. Use markdown for bolding key terms.
+            Answer as a helpful Loan Assistant. 
+            If explaining, use "## Explanation" header.
+            If translating, just provide the translation.
+            Use bolding for key terms.
             `;
 
             const result = await ai.models.generateContent({
@@ -366,7 +498,10 @@ const LoanAssistant: React.FC<LoanAssistantProps> = ({ documents, activeDocId, s
                      </AnimatePresence>
 
                      {/* Document Content */}
-                     <div className="flex-1 overflow-y-auto p-8 scroll-smooth">
+                     <div 
+                        onMouseUp={handleDocumentMouseUp}
+                        className="flex-1 overflow-y-auto p-8 scroll-smooth cursor-text selection:bg-primary/30 selection:text-white"
+                     >
                         <motion.div 
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -414,14 +549,11 @@ const LoanAssistant: React.FC<LoanAssistantProps> = ({ documents, activeDocId, s
                                     {/* Message Actions */}
                                     {msg.role === 'model' && (
                                         <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border/50 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button className="text-textMuted hover:text-primary transition-colors flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider">
+                                            <button className="text-textMuted hover:text-primary transition-colors flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider" onClick={() => startReading(msg.text)}>
                                                 <Volume2 className="w-3 h-3" /> Listen
                                             </button>
                                             <button className="text-textMuted hover:text-primary transition-colors flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider">
-                                                <Globe className="w-3 h-3" /> Translate
-                                            </button>
-                                            <button className="text-textMuted hover:text-primary transition-colors flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider ml-auto">
-                                                <Copy className="w-3 h-3" />
+                                                <Copy className="w-3 h-3" /> Copy
                                             </button>
                                         </div>
                                     )}
@@ -456,11 +588,111 @@ const LoanAssistant: React.FC<LoanAssistantProps> = ({ documents, activeDocId, s
                         <div ref={chatEndRef} />
                     </div>
 
+                    {/* SELECTION CONTEXT PANEL */}
+                    <AnimatePresence>
+                        {selectedText && (
+                            <motion.div 
+                                initial={{ opacity: 0, y: 50 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 50 }}
+                                className="absolute bottom-[80px] left-4 right-4 bg-surface/95 backdrop-blur-xl border border-primary/20 rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.5)] overflow-hidden z-40"
+                            >
+                                <div className="p-3 bg-surfaceHighlight border-b border-border flex justify-between items-center">
+                                    <div className="flex items-center gap-2 text-xs font-bold text-primary uppercase tracking-wider">
+                                        <ScanLine className="w-3 h-3" /> Selected Text
+                                    </div>
+                                    <button onClick={clearSelection} className="p-1 hover:bg-white/10 rounded">
+                                        <X className="w-3 h-3 text-textMuted" />
+                                    </button>
+                                </div>
+                                <div className="p-4">
+                                    <div className="text-xs text-textMuted italic line-clamp-2 mb-4 font-serif bg-black/20 p-2 rounded border border-white/5">
+                                        "{selectedText}"
+                                    </div>
+
+                                    {/* Action Grid */}
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {/* READ OUT LOUD */}
+                                        <div className="col-span-1">
+                                            {!isReading ? (
+                                                <button 
+                                                    onClick={handleReadAloud}
+                                                    className="w-full flex flex-col items-center justify-center gap-2 p-3 rounded-lg bg-surface border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group h-full"
+                                                >
+                                                    <Volume2 className="w-5 h-5 text-textMuted group-hover:text-primary" />
+                                                    <span className="text-[10px] font-bold uppercase text-textMuted group-hover:text-text">Read Aloud</span>
+                                                </button>
+                                            ) : (
+                                                <div className="w-full p-2 rounded-lg bg-primary/10 border border-primary/30 flex flex-col gap-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex gap-0.5 items-end h-3">
+                                                            {[1,2,3,4].map(i => <motion.div key={i} animate={{ height: [3, 10, 3] }} transition={{ repeat: Infinity, duration: 0.5, delay: i*0.1 }} className="w-0.5 bg-primary rounded-full" />)}
+                                                        </div>
+                                                        <button onClick={changeSpeed} className="text-[9px] font-mono bg-surface/50 px-1 rounded hover:text-white transition-colors">{readingSpeed}x</button>
+                                                    </div>
+                                                    <div className="flex justify-between items-center">
+                                                        <button onClick={togglePause} className="p-1 rounded hover:bg-white/10 text-primary">
+                                                            {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                                                        </button>
+                                                        <button onClick={stopReading} className="p-1 rounded hover:bg-white/10 text-red-400">
+                                                            <X className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* EXPLAIN */}
+                                        <button 
+                                            onClick={handleExplain}
+                                            className="col-span-1 flex flex-col items-center justify-center gap-2 p-3 rounded-lg bg-surface border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group"
+                                        >
+                                            <BrainCircuit className="w-5 h-5 text-textMuted group-hover:text-accent" />
+                                            <span className="text-[10px] font-bold uppercase text-textMuted group-hover:text-text">Explain</span>
+                                        </button>
+
+                                        {/* TRANSLATE */}
+                                        <div className="col-span-1 relative">
+                                            <button 
+                                                onClick={() => setShowTranslateMenu(!showTranslateMenu)}
+                                                className={`w-full h-full flex flex-col items-center justify-center gap-2 p-3 rounded-lg border transition-all group ${showTranslateMenu ? 'bg-primary/10 border-primary text-white' : 'bg-surface border-border hover:border-primary/50 hover:bg-primary/5'}`}
+                                            >
+                                                <Globe className={`w-5 h-5 ${showTranslateMenu ? 'text-primary' : 'text-textMuted group-hover:text-emerald-400'}`} />
+                                                <span className={`text-[10px] font-bold uppercase ${showTranslateMenu ? 'text-primary' : 'text-textMuted group-hover:text-text'}`}>Translate</span>
+                                            </button>
+                                            
+                                            <AnimatePresence>
+                                                {showTranslateMenu && (
+                                                    <motion.div 
+                                                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                        exit={{ opacity: 0, scale: 0.95 }}
+                                                        className="absolute bottom-full right-0 mb-2 w-40 bg-surface border border-border rounded-lg shadow-xl overflow-hidden z-50"
+                                                    >
+                                                        {LANGUAGES.map(lang => (
+                                                            <button 
+                                                                key={lang.code}
+                                                                onClick={() => handleTranslate(lang.code)}
+                                                                className="w-full text-left px-3 py-2 text-xs text-textMuted hover:text-text hover:bg-surfaceHighlight flex items-center gap-2"
+                                                            >
+                                                                <span>{lang.flag}</span> {lang.label}
+                                                            </button>
+                                                        ))}
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
+                                        </div>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
                     {/* Unified Input Area */}
                     <div className="p-4 border-t border-border bg-surface/80 backdrop-blur-md min-w-[450px]">
                         
                         {/* Suggestion Chips */}
-                        {!input && !isVoiceActive && (
+                        {!input && !isVoiceActive && !selectedText && (
                             <div className="flex gap-2 mb-3 overflow-x-auto no-scrollbar">
                                 {SUGGESTED_QUESTIONS.map((q, i) => (
                                     <button 
@@ -494,7 +726,7 @@ const LoanAssistant: React.FC<LoanAssistantProps> = ({ documents, activeDocId, s
                                 type="text"
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleSendText()}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSendText(input)}
                                 disabled={isVoiceActive} // Disable text input during live voice session for simplicity
                                 placeholder={isVoiceActive ? "Listening..." : "Ask about your loan..."}
                                 className="flex-1 bg-transparent border-none focus:ring-0 text-sm text-text placeholder:text-textMuted/50 h-10"
@@ -502,7 +734,7 @@ const LoanAssistant: React.FC<LoanAssistantProps> = ({ documents, activeDocId, s
 
                             {/* Send Button */}
                             <button 
-                                onClick={() => handleSendText()}
+                                onClick={() => handleSendText(input)}
                                 disabled={!input.trim() || isVoiceActive}
                                 className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary text-white disabled:opacity-50 disabled:bg-surfaceHighlight disabled:text-textMuted transition-all hover:bg-primary/90"
                             >
