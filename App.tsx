@@ -4,10 +4,12 @@ import Sidebar from './components/Sidebar';
 import TalkToDocuments from './components/TalkToDocuments';
 import UploadDocuments from './components/UploadDocuments';
 import DocumentIntegrator from './components/DocumentIntegrator';
+import LandingPage from './components/LandingPage';
 import { ViewMode, DocumentFile } from './types';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const App: React.FC = () => {
+  const [showLanding, setShowLanding] = useState(true);
   const [currentView, setCurrentView] = useState<ViewMode>(ViewMode.UPLOAD);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -95,6 +97,10 @@ const App: React.FC = () => {
         return <UploadDocuments documents={documents} setDocuments={setDocuments} onUpload={handleUploadFiles} />;
     }
   };
+
+  if (showLanding) {
+    return <LandingPage onEnterApp={() => setShowLanding(false)} />;
+  }
 
   return (
     <div className="flex h-screen w-screen bg-background text-text overflow-hidden font-sans transition-colors duration-500 relative selection:bg-primary/20">

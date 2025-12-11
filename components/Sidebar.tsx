@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { ViewMode } from '../types';
-import { Mic, FileUp, Sparkles, Bot, Settings, Menu, Sun, Moon, Lock } from 'lucide-react';
+import { Mic, FileUp, Sparkles, Bot, Settings, Menu, Sun, Moon, Lock, ScanLine } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface SidebarProps {
@@ -34,9 +34,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange, isOpen, to
              className="flex items-center gap-3"
            >
              <div className="w-8 h-8 rounded-lg bg-primary/20 border border-primary/20 flex items-center justify-center shadow-inner">
-                <Bot className="text-primary w-5 h-5" />
+                <ScanLine className="text-primary w-5 h-5" />
              </div>
-             <span className="font-bold text-lg tracking-tight text-text font-sans">LoanAI</span>
+             <span className="font-bold text-lg tracking-tight text-text font-sans">LoanSight</span>
            </motion.div>
         )}
         <button 
