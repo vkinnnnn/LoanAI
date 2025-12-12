@@ -1,8 +1,4 @@
-
-import { DocumentFile } from '../types';
-
-// Change this to your actual backend URL
-const API_BASE_URL = 'http://localhost:8000';
+import { MOCK_LOAN_DOC_CONTENT } from './gemini';
 
 export interface UploadResponse {
   content: string;
@@ -13,41 +9,27 @@ export interface UploadResponse {
 export const api = {
   /**
    * Uploads a file to the backend for text extraction.
+   * MOCKED for frontend-only demo to prevent "Failed to fetch" errors.
    */
   async uploadDocument(file: File): Promise<UploadResponse> {
-    const formData = new FormData();
-    formData.append('file', file);
+    console.log("Mocking upload for:", file.name);
+    
+    // Simulate network processing delay (1.5s) to allow UI animations to play
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/upload`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      return {
-        content: data.content || '',
-        accuracy: data.accuracy || 0
-      };
-    } catch (error) {
-      console.error("Upload failed:", error);
-      throw error;
-    }
+    // Return mock data derived from the provided mock content
+    // In a real production app, this would be a fetch call:
+    // await fetch('/upload', { method: 'POST', body: formData })
+    return {
+      content: MOCK_LOAN_DOC_CONTENT,
+      accuracy: 0.98
+    };
   },
 
   /**
-   * Health check to see if backend is available
+   * Health check stub
    */
   async checkHealth(): Promise<boolean> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/health`);
-      return res.ok;
-    } catch {
-      return false;
-    }
+    return true;
   }
 };
