@@ -1,11 +1,11 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { 
   ArrowRight, Activity, GitBranch, Database, Cpu, Search, 
   ShieldCheck, Lock, BarChart3, Zap, Layers, FileText, 
-  Terminal, Network, CheckCircle2, Server, Layout, ChevronRight, Play
+  Terminal, Network, CheckCircle2, Server, Layout, ChevronRight, Play, Menu, X, ChevronDown
 } from 'lucide-react';
-import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
+import { motion, useScroll, useTransform, useSpring, AnimatePresence } from 'framer-motion';
 
 interface LandingPageProps {
   onEnterApp: () => void;
@@ -15,29 +15,31 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
   const { scrollY } = useScroll();
   const heroY = useTransform(scrollY, [0, 500], [0, 150]);
   const opacity = useTransform(scrollY, [0, 300], [1, 0]);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-primary/20 selection:text-primary overflow-x-hidden">
       
       {/* Background Ambience */}
       <div className="fixed inset-0 z-0 pointer-events-none">
-        {/* Subtle grid pattern from screenshot */}
+        {/* Subtle grid pattern */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px]"></div>
         <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-blue-500/5 rounded-full blur-[150px] opacity-20"></div>
       </div>
 
-      {/* Navbar - Matches Screenshot */}
+      {/* Navbar */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-[#050505]/90 backdrop-blur-md border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-6 h-16 md:h-20 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer group" onClick={onEnterApp}>
-            <div className="w-8 h-8 bg-surfaceHighlight rounded border border-white/10 flex items-center justify-center">
+            <div className="w-8 h-8 bg-surfaceHighlight rounded border border-white/10 flex items-center justify-center shrink-0">
                <Activity className="w-5 h-5 text-primary" />
             </div>
-            <span className="font-bold text-xl tracking-tight text-white">LoanSight <span className="text-zinc-500 font-normal">| AI</span></span>
+            <span className="font-bold text-lg md:text-xl tracking-tight text-white truncate">LoanSight <span className="text-zinc-500 font-normal">| AI</span></span>
           </div>
           
-          <div className="flex items-center gap-10">
-            <div className="hidden md:flex items-center gap-8 text-[11px] font-bold text-zinc-400 uppercase tracking-widest">
+          {/* Desktop Nav */}
+          <div className="hidden md:flex items-center gap-10">
+            <div className="flex items-center gap-8 text-[11px] font-bold text-zinc-400 uppercase tracking-widest">
               <a href="#pipeline" className="hover:text-white transition-colors">Features</a>
               <a href="#evaluation" className="hover:text-white transition-colors">Accuracy</a>
               <a href="#security" className="hover:text-white transition-colors">Security</a>
@@ -49,37 +51,86 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
               Launch App
             </button>
           </div>
+
+          {/* Mobile Menu Toggle */}
+          <div className="md:hidden flex items-center gap-4">
+             <button 
+                onClick={onEnterApp} 
+                className="text-xs font-bold bg-white text-black px-4 py-2 rounded"
+             >
+                Launch
+             </button>
+             <button onClick={() => setIsMobileMenuOpen(true)} className="text-zinc-300">
+                <Menu className="w-6 h-6" />
+             </button>
+          </div>
         </div>
       </nav>
 
+      {/* Mobile Menu Overlay */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div 
+            initial={{ opacity: 0, x: '100%' }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: '100%' }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="fixed inset-0 z-[60] bg-[#050505] flex flex-col p-6 md:hidden"
+          >
+            <div className="flex justify-between items-center mb-10">
+                <div className="flex items-center gap-3">
+                    <Activity className="w-6 h-6 text-primary" />
+                    <span className="font-bold text-xl">LoanSight</span>
+                </div>
+                <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 bg-white/5 rounded-full">
+                    <X className="w-6 h-6" />
+                </button>
+            </div>
+            <div className="flex flex-col gap-6 text-lg font-medium text-zinc-300">
+                <a href="#pipeline" onClick={() => setIsMobileMenuOpen(false)} className="border-b border-white/5 pb-4">Features</a>
+                <a href="#evaluation" onClick={() => setIsMobileMenuOpen(false)} className="border-b border-white/5 pb-4">Accuracy</a>
+                <a href="#security" onClick={() => setIsMobileMenuOpen(false)} className="border-b border-white/5 pb-4">Security</a>
+            </div>
+            <div className="mt-auto">
+                <button 
+                  onClick={() => { onEnterApp(); setIsMobileMenuOpen(false); }}
+                  className="w-full py-4 bg-primary text-black font-bold text-center rounded-xl"
+                >
+                  Launch Platform
+                </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Hero Section */}
-      <section className="relative pt-40 pb-20 px-6 min-h-[90vh] flex items-center justify-center z-10 border-b border-white/5">
+      <section className="relative pt-32 pb-16 md:pt-40 md:pb-20 px-6 min-h-[85vh] flex items-center justify-center z-10 border-b border-white/5">
         <motion.div 
           style={{ y: heroY, opacity }}
-          className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center"
+          className="max-w-7xl w-full mx-auto grid lg:grid-cols-2 gap-12 lg:gap-16 items-center"
         >
           {/* Hero Content */}
-          <div className="text-left space-y-8 relative">
+          <div className="text-left space-y-6 md:space-y-8 relative">
             
             {/* Status Badge */}
             <motion.div 
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5 }}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/20 bg-primary/5 cursor-default backdrop-blur-sm"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/20 bg-primary/5 cursor-default backdrop-blur-sm max-w-full"
             >
-              <span className="relative flex h-2 w-2">
+              <span className="relative flex h-2 w-2 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
               </span>
-              <span className="text-xs font-mono font-medium text-primary tracking-tight">GEMINI 2.5 FLASH INFERENCE ACTIVE</span>
+              <span className="text-[10px] md:text-xs font-mono font-medium text-primary tracking-tight truncate">GEMINI 2.5 FLASH INFERENCE ACTIVE</span>
             </motion.div>
             
             <motion.h1 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
-              className="text-5xl md:text-7xl font-bold tracking-tight leading-[1.05]"
+              className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-[1.1] md:leading-[1.05]"
             >
               LoanSight <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-white to-zinc-400">Your Loan Document Companion</span>
@@ -89,7 +140,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="text-lg text-zinc-400 max-w-xl leading-relaxed font-light"
+              className="text-base md:text-lg text-zinc-400 max-w-xl leading-relaxed font-light"
             >
               Make sense of complex loan documents in seconds. Ask questions, get clear answers, and understand every detail without the confusion.
             </motion.p>
@@ -98,16 +149,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.3 }}
-              className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-4"
+              className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-4"
             >
               <button 
                 onClick={onEnterApp}
-                className="group px-8 py-4 bg-primary text-black font-bold rounded-xl hover:bg-primary/90 transition-all flex items-center gap-2 shadow-[0_0_30px_rgba(50,184,198,0.2)]"
+                className="group h-14 px-8 bg-primary text-black font-bold rounded-xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-[0_0_30px_rgba(50,184,198,0.2)]"
               >
                 Start Analysis <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </button>
               
-              <div className="flex items-center gap-4 px-6 py-4 rounded-xl border border-white/5 bg-white/[0.02]">
+              <div className="flex h-14 items-center justify-center gap-4 px-6 rounded-xl border border-white/5 bg-white/[0.02]">
                 <div className="flex -space-x-2">
                    {[1,2,3].map(i => (
                      <div key={i} className="w-8 h-8 rounded-full bg-zinc-800 border border-[#050505] flex items-center justify-center text-[10px] font-mono text-zinc-400">
@@ -122,23 +173,41 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
             </motion.div>
           </div>
 
-          {/* Hero Visual - Pipeline Visualization */}
+          {/* Hero Visual - Pipeline Visualization (Hidden on Mobile) */}
           <div className="relative hidden lg:block h-[500px] w-full">
             <PipelineVisual />
           </div>
         </motion.div>
       </section>
 
-      {/* Tech Stack Ticker */}
+      {/* Tech Stack - Adaptive: Grid on Mobile, Marquee on Desktop */}
       <section className="py-12 border-y border-white/5 bg-white/[0.02] overflow-hidden relative">
-        <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-[#050505] to-transparent z-10"></div>
-        <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-[#050505] to-transparent z-10"></div>
+        <div className="absolute inset-y-0 left-0 w-8 md:w-32 bg-gradient-to-r from-[#050505] to-transparent z-10"></div>
+        <div className="absolute inset-y-0 right-0 w-8 md:w-32 bg-gradient-to-l from-[#050505] to-transparent z-10"></div>
         
         <div className="max-w-7xl mx-auto px-6 mb-8 text-center">
           <p className="text-xs font-mono text-zinc-500 uppercase tracking-[0.2em]">Production MLOps Stack</p>
         </div>
         
-        <div className="flex overflow-hidden">
+        {/* Mobile Grid */}
+        <div className="md:hidden grid grid-cols-2 gap-y-6 gap-x-4 px-6">
+             {[
+               { icon: Cpu, label: "Gemini 2.5" },
+               { icon: Database, label: "Pinecone" },
+               { icon: GitBranch, label: "LangChain" },
+               { icon: ShieldCheck, label: "TruLens" },
+               { icon: Activity, label: "MLflow" },
+               { icon: Network, label: "FastAPI" },
+             ].map((tech, i) => (
+                <div key={i} className="flex items-center gap-3 justify-center">
+                   <tech.icon className="w-5 h-5 text-zinc-400" strokeWidth={1.5} />
+                   <span className="text-sm font-bold text-zinc-300 whitespace-nowrap">{tech.label}</span>
+                </div>
+             ))}
+        </div>
+
+        {/* Desktop Marquee */}
+        <div className="hidden md:flex overflow-hidden">
           <div className="animate-marquee flex gap-16 items-center min-w-full">
              {[
                { icon: Cpu, label: "Gemini 2.5" },
@@ -149,15 +218,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
                { icon: Server, label: "Docker" },
                { icon: Network, label: "FastAPI" },
                { icon: Layout, label: "React 19" },
-               // Repeat
                { icon: Cpu, label: "Gemini 2.5" },
                { icon: Database, label: "Pinecone" },
                { icon: GitBranch, label: "LangChain" },
                { icon: ShieldCheck, label: "TruLens" },
-               { icon: Activity, label: "MLflow" },
-               { icon: Server, label: "Docker" },
-               { icon: Network, label: "FastAPI" },
-               { icon: Layout, label: "React 19" },
              ].map((tech, i) => (
                 <div key={i} className="flex items-center gap-3 opacity-50 hover:opacity-100 transition-opacity cursor-default">
                    <tech.icon className="w-5 h-5 text-zinc-400" strokeWidth={1.5} />
@@ -169,9 +233,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
       </section>
 
       {/* Features - Bento Grid */}
-      <section id="pipeline" className="py-32 relative z-10 bg-[#050505]">
+      <section id="pipeline" className="py-20 md:py-32 relative z-10 bg-[#050505]">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="mb-20">
+          <div className="mb-12 md:mb-20">
              <motion.div 
                initial={{ opacity: 0, y: 20 }}
                whileInView={{ opacity: 1, y: 0 }}
@@ -185,21 +249,21 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
                whileInView={{ opacity: 1, y: 0 }}
                viewport={{ once: true }}
                transition={{ delay: 0.1 }}
-               className="text-4xl md:text-5xl font-bold text-zinc-100 max-w-2xl leading-tight"
+               className="text-3xl md:text-5xl font-bold text-zinc-100 max-w-2xl leading-tight"
              >
                More than just Chat. <br/>
                <span className="text-zinc-500">A complete cognitive engine.</span>
              </motion.h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[300px]">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-auto md:auto-rows-[300px]">
             
             {/* Feature 1: RAG */}
             <BentoCard 
               colSpan="md:col-span-2"
               title="Hybrid RAG Pipeline"
               subtitle="Semantic + Keyword Search"
-              description="Our architecture splits documents into semantic chunks, embedding them with high-dimensional vectors while retaining keyword indexing. This ensures retrieval is both conceptually accurate and precise with specific financial terms."
+              description="Our architecture splits documents into semantic chunks, embedding them with high-dimensional vectors while retaining keyword indexing."
               icon={Search}
               graphic={<RagVisual />}
             />
@@ -213,19 +277,19 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
               icon={ShieldCheck}
               graphic={
                 <div className="absolute inset-0 flex items-center justify-center pt-10">
-                   <div className="w-32 h-32 relative">
+                   <div className="w-24 h-24 md:w-32 md:h-32 relative">
                       <svg className="w-full h-full -rotate-90">
-                         <circle cx="64" cy="64" r="56" fill="none" stroke="#27272a" strokeWidth="8" />
+                         <circle cx="50%" cy="50%" r="40%" fill="none" stroke="#27272a" strokeWidth="8" />
                          <motion.circle 
-                            cx="64" cy="64" r="56" fill="none" stroke="#32b8c6" strokeWidth="8" 
-                            strokeDasharray="351" strokeDashoffset="351"
-                            whileInView={{ strokeDashoffset: 35 }}
+                            cx="50%" cy="50%" r="40%" fill="none" stroke="#32b8c6" strokeWidth="8" 
+                            strokeDasharray="251" strokeDashoffset="251"
+                            whileInView={{ strokeDashoffset: 25 }}
                             transition={{ duration: 1.5, ease: "easeOut" }}
                          />
                       </svg>
                       <div className="absolute inset-0 flex flex-col items-center justify-center">
-                         <span className="text-3xl font-bold text-white">98%</span>
-                         <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Accuracy</span>
+                         <span className="text-2xl md:text-3xl font-bold text-white">98%</span>
+                         <span className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-wider">Accuracy</span>
                       </div>
                    </div>
                 </div>
@@ -255,7 +319,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
               colSpan="md:col-span-2"
               title="Ephemeral Processing"
               subtitle="Zero-Retention Architecture"
-              description="Documents are processed in volatile memory containers. No data persists on disk after the session concludes, ensuring complete client confidentiality."
+              description="Documents are processed in volatile memory containers. No data persists on disk after the session concludes."
               icon={Lock}
               graphic={<SecurityVisual />}
             />
@@ -263,71 +327,49 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
         </div>
       </section>
 
-      {/* Updated CTA Section - Matches Screenshot */}
-      <section className="py-24 bg-[#050505] relative overflow-hidden">
+      {/* CTA Section */}
+      <section className="py-16 md:py-24 bg-[#050505] relative overflow-hidden">
          <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
             <h2 className="text-3xl md:text-5xl font-bold text-white mb-6 tracking-tight">Ready to accelerate your workflow?</h2>
-            <p className="text-zinc-400 mb-10 text-lg">Deploy the LoanSight agent to analyze complex agreements in seconds.</p>
+            <p className="text-zinc-400 mb-10 text-base md:text-lg">Deploy the LoanSight agent to analyze complex agreements in seconds.</p>
             
             <button 
               onClick={onEnterApp}
-              className="group relative inline-flex items-center justify-center px-12 py-4 text-base font-bold text-black transition-all duration-200 bg-gradient-to-t from-zinc-200 to-white rounded-full hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white/50 shadow-[0_0_30px_rgba(255,255,255,0.1)]"
+              className="group relative w-full md:w-auto inline-flex items-center justify-center px-12 py-4 text-base font-bold text-black transition-all duration-200 bg-gradient-to-t from-zinc-200 to-white rounded-full hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white/50 shadow-[0_0_30px_rgba(255,255,255,0.1)]"
             >
               Launch Platform
             </button>
          </div>
       </section>
 
-      {/* Enterprise Sitemap Section - Blue Border Container */}
-      <section className="pb-20 pt-10 px-6 bg-[#050505]">
-          <div className="max-w-7xl mx-auto border border-blue-400/50 rounded-none p-10 md:p-14 relative bg-[#080808]/50 shadow-[0_0_50px_-20px_rgba(59,130,246,0.2)]">
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-10">
-                {/* Column 1 */}
-                <div className="space-y-6">
-                    <h4 className="text-sm font-bold text-white">Organization</h4>
-                    <ul className="space-y-3 text-sm text-zinc-500">
-                        {['About LoanSight', 'Careers', 'Trust Center', 'Security & Compliance', 'Partners', 'Investor Relations', 'Contact Us'].map((item, i) => (
-                            <li key={i}><a href="#" className="hover:text-primary transition-colors block py-0.5">{item}</a></li>
-                        ))}
-                    </ul>
-                </div>
+      {/* Responsive Footer - Accordion on Mobile, Grid on Desktop */}
+      <section className="pb-20 pt-10 px-0 md:px-6 bg-[#050505]">
+          <div className="max-w-7xl mx-auto border-t md:border border-blue-400/50 rounded-none p-0 md:p-14 relative bg-[#080808]/50 shadow-none md:shadow-[0_0_50px_-20px_rgba(59,130,246,0.2)]">
+            <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-0 md:gap-10">
+                
+                <FooterSection 
+                    title="Organization" 
+                    items={['About LoanSight', 'Careers', 'Trust Center', 'Security & Compliance', 'Partners', 'Investor Relations', 'Contact Us']} 
+                />
+                <FooterSection 
+                    title="Platform Resources" 
+                    items={['Documentation', 'API Reference', 'System Status', 'Community Forum', 'Developer Blog', 'Integrations']} 
+                />
+                <FooterSection 
+                    title="Use Cases" 
+                    items={['Loan Origination', 'Risk Analysis', 'Compliance Audit', 'Portfolio Monitoring', 'Legal Review']} 
+                />
+                <FooterSection 
+                    title="Support & Services" 
+                    items={['Help Center', 'Professional Services', 'Training Academy', 'Enterprise Support', 'Whitepapers']} 
+                />
 
-                {/* Column 2 */}
-                <div className="space-y-6">
-                    <h4 className="text-sm font-bold text-white">Platform Resources</h4>
-                    <ul className="space-y-3 text-sm text-zinc-500">
-                        {['Documentation', 'API Reference', 'System Status', 'Community Forum', 'Developer Blog', 'Integrations', 'Changelog'].map((item, i) => (
-                            <li key={i}><a href="#" className="hover:text-primary transition-colors block py-0.5">{item}</a></li>
-                        ))}
-                    </ul>
-                </div>
-
-                {/* Column 3 */}
-                <div className="space-y-6">
-                    <h4 className="text-sm font-bold text-white">Use Cases</h4>
-                    <ul className="space-y-3 text-sm text-zinc-500">
-                        {['Loan Origination', 'Risk Analysis', 'Compliance Audit', 'Portfolio Monitoring', 'Legal Review', 'Audit Trails'].map((item, i) => (
-                            <li key={i}><a href="#" className="hover:text-primary transition-colors block py-0.5">{item}</a></li>
-                        ))}
-                    </ul>
-                </div>
-
-                {/* Column 4 */}
-                <div className="space-y-6">
-                    <h4 className="text-sm font-bold text-white">Support & Services</h4>
-                    <ul className="space-y-3 text-sm text-zinc-500">
-                        {['Help Center', 'Professional Services', 'Training Academy', 'Enterprise Support', 'Whitepapers', 'Privacy Policy'].map((item, i) => (
-                            <li key={i}><a href="#" className="hover:text-primary transition-colors block py-0.5">{item}</a></li>
-                        ))}
-                    </ul>
-                </div>
-
-                {/* Column 5 - "What is..." */}
-                <div className="space-y-6 col-span-2 lg:col-span-1">
+                {/* Column 5 - "What is..." (Always visible or special styling) */}
+                <div className="p-6 md:p-0 space-y-6 col-span-1 border-t border-white/5 md:border-none">
                     <h4 className="text-sm font-bold text-white flex items-center gap-2">
                         What is... <ChevronRight className="w-3 h-3 text-blue-400" />
                     </h4>
-                    <ul className="space-y-3 text-sm text-zinc-400 font-medium">
+                    <ul className="space-y-4 md:space-y-3 text-sm text-zinc-400 font-medium">
                         {[
                             'Retrieval Augmented Gen (RAG)', 
                             'Vector Search', 
@@ -335,29 +377,28 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
                             'Responsible AI', 
                             'LLM Hallucinations', 
                             'Semantic Analysis',
-                            'Generative AI for Finance'
                         ].map((item, i) => (
-                            <li key={i}><a href="#" className="hover:text-primary transition-colors block py-0.5 border-l-2 border-transparent hover:border-primary pl-0 hover:pl-2 transition-all">{item}</a></li>
+                            <li key={i}><a href="#" className="hover:text-primary transition-colors block py-1 md:py-0.5 border-l-2 border-transparent hover:border-primary pl-0 hover:pl-2 transition-all">{item}</a></li>
                         ))}
                     </ul>
                 </div>
             </div>
             
-            {/* Corner Accents for Tech Feel */}
-            <div className="absolute top-0 left-0 w-4 h-4 border-t border-l border-blue-400"></div>
-            <div className="absolute top-0 right-0 w-4 h-4 border-t border-r border-blue-400"></div>
-            <div className="absolute bottom-0 left-0 w-4 h-4 border-b border-l border-blue-400"></div>
-            <div className="absolute bottom-0 right-0 w-4 h-4 border-b border-r border-blue-400"></div>
+            {/* Corner Accents for Tech Feel (Desktop Only) */}
+            <div className="hidden md:block absolute top-0 left-0 w-4 h-4 border-t border-l border-blue-400"></div>
+            <div className="hidden md:block absolute top-0 right-0 w-4 h-4 border-t border-r border-blue-400"></div>
+            <div className="hidden md:block absolute bottom-0 left-0 w-4 h-4 border-b border-l border-blue-400"></div>
+            <div className="hidden md:block absolute bottom-0 right-0 w-4 h-4 border-b border-r border-blue-400"></div>
           </div>
       </section>
 
-      {/* Footer */}
+      {/* Footer Bottom */}
       <footer className="py-8 bg-[#020202] border-t border-white/5">
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between text-xs text-zinc-600 font-mono">
-            <div>© 2025 LoanSight MLOps. Open Source License.</div>
-            <div className="flex gap-4">
-                <a href="#" className="hover:text-zinc-400">Privacy</a>
-                <a href="#" className="hover:text-zinc-400">Terms</a>
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-zinc-600 font-mono">
+            <div className="text-center md:text-left">© 2025 LoanSight MLOps. Open Source License.</div>
+            <div className="flex gap-6">
+                <a href="#" className="hover:text-zinc-400 p-2 md:p-0">Privacy</a>
+                <a href="#" className="hover:text-zinc-400 p-2 md:p-0">Terms</a>
             </div>
         </div>
       </footer>
@@ -367,26 +408,53 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
 
 // --- Subcomponents ---
 
+const FooterSection = ({ title, items }: { title: string, items: string[] }) => (
+    <div className="border-b border-white/5 md:border-none last:border-none">
+        {/* Mobile Accordion */}
+        <details className="group md:hidden">
+            <summary className="flex items-center justify-between px-6 py-5 cursor-pointer list-none text-sm font-bold text-white bg-[#0a0a0a] active:bg-white/5">
+                {title}
+                <ChevronDown className="w-4 h-4 text-zinc-500 transition-transform group-open:rotate-180" />
+            </summary>
+            <ul className="px-6 pb-6 space-y-4 text-sm text-zinc-500 bg-[#080808]">
+                {items.map((item, i) => (
+                    <li key={i}><a href="#" className="block py-1 hover:text-primary transition-colors">{item}</a></li>
+                ))}
+            </ul>
+        </details>
+
+        {/* Desktop List */}
+        <div className="hidden md:block space-y-6">
+             <h4 className="text-sm font-bold text-white">{title}</h4>
+             <ul className="space-y-3 text-sm text-zinc-500">
+                {items.map((item, i) => (
+                    <li key={i}><a href="#" className="hover:text-primary transition-colors block py-0.5">{item}</a></li>
+                ))}
+            </ul>
+        </div>
+    </div>
+);
+
 const BentoCard = ({ title, subtitle, description, icon: Icon, graphic, colSpan }: any) => (
   <motion.div 
     initial={{ opacity: 0, scale: 0.95 }}
     whileInView={{ opacity: 1, scale: 1 }}
     viewport={{ once: true, margin: "-50px" }}
     transition={{ duration: 0.5 }}
-    className={`${colSpan} relative bg-surface/30 rounded-3xl border border-white/5 overflow-hidden group hover:border-white/10 transition-colors`}
+    className={`${colSpan} relative min-h-[280px] bg-surface/30 rounded-3xl border border-white/5 overflow-hidden group hover:border-white/10 transition-colors`}
   >
     <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
     
     {/* Content */}
-    <div className="absolute inset-0 p-8 flex flex-col z-20 pointer-events-none">
+    <div className="absolute inset-0 p-6 md:p-8 flex flex-col z-20 pointer-events-none">
        <div className="flex items-start justify-between mb-4">
           <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center text-zinc-400 group-hover:text-primary group-hover:bg-primary/10 transition-colors">
              <Icon className="w-5 h-5" />
           </div>
-          {subtitle && <span className="text-[10px] font-mono text-zinc-500 border border-white/5 px-2 py-1 rounded bg-[#050505]/50">{subtitle}</span>}
+          {subtitle && <span className="text-[10px] font-mono text-zinc-500 border border-white/5 px-2 py-1 rounded bg-[#050505]/50 hidden sm:inline-block">{subtitle}</span>}
        </div>
-       <h3 className="text-xl font-bold text-zinc-100 mb-2 group-hover:text-white transition-colors">{title}</h3>
-       <p className="text-sm text-zinc-400 leading-relaxed max-w-[80%]">{description}</p>
+       <h3 className="text-lg md:text-xl font-bold text-zinc-100 mb-2 group-hover:text-white transition-colors">{title}</h3>
+       <p className="text-sm text-zinc-400 leading-relaxed max-w-[90%] md:max-w-[80%]">{description}</p>
     </div>
 
     {/* Graphic Background Area */}
